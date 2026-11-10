@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#0c0d0f" />
-    <meta name="description" content="Turn any 3D model into a branded halftone-shape graphic and export it as PNG, SVG, GIF or MP4." />
+    <meta name="description" content="Turn any 3D model or image into a branded halftone-shape graphic and export it as PNG, SVG, GIF or MP4." />
     <title>RASTR Studio</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%230c0d0f'/%3E%3Cg fill='%23d7ff3e'%3E%3Crect x='2' y='2' width='5' height='5' rx='1'/%3E%3Crect x='9' y='9' width='5' height='5' rx='1'/%3E%3Ccircle cx='11.5' cy='4.5' r='1.5'/%3E%3Ccircle cx='4.5' cy='11.5' r='1.5'/%3E%3C/g%3E%3C/svg%3E" />
   </head>
@@ -39,12 +39,12 @@
 
         <footer class="dock">
           <div class="dock-row">
-            <button type="button" class="btn primary" id="swap">SWAP 3D MODEL</button>
+            <button type="button" class="btn primary" id="swap">LOAD MODEL / IMAGE</button>
             <div class="objects" id="objects" role="group" aria-label="Built-in objects"></div>
           </div>
           <div class="status">
             <span id="stats"></span>
-            <span class="keys">DROP .GLB / .GLTF / .OBJ / .STL ANYWHERE · ⌘Z UNDO · E PNG · G GIF · R RESET · SPACE PLAY</span>
+            <span class="keys">DROP A 3D MODEL OR AN IMAGE ANYWHERE · ⌘Z UNDO · E PNG · G GIF · R RESET · SPACE PLAY</span>
           </div>
         </footer>
       </main>
@@ -54,6 +54,7 @@
 
     <input type="file" id="file-model" hidden multiple />
     <input type="file" id="file-preset" hidden accept=".json,application/json" />
+    <input type="file" id="file-icon" hidden accept="image/*,.svg" />
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

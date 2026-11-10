@@ -1,11 +1,12 @@
 import './style.css';
-import { createStore, ASPECTS } from './state.js';
+import { createStore, ASPECTS, DEFAULTS } from './state.js';
 import { Stage } from './stage.js';
 import { gridDims, computeCells, drawCanvas, toSVG } from './halftone.js';
 import { buildPanel } from './panel.js';
 import { createSchema } from './schema.js';
 import { OBJECTS, buildObject } from './objects.js';
-import { loadModelFiles } from './loaders.js';
+import { loadModelFiles, MODEL_EXTENSIONS } from './loaders.js';
+import { createIcon, ensureIcons, fileToCanvas, isImageFile, MAX_ICONS } from './icons.js';
 import { exportPNG, exportSVG, exportGIF, exportMP4, download, frameSize } from './export.js';
 
 const $ = (id) => document.getElementById(id);
@@ -35,6 +36,8 @@ let phase = 0;
 let dirty = true;
 let busy = false;
 let customName = '';
+let customKind = 'custom'; // 'custom' = uploaded model, 'image' = uploaded picture
+let motionBeforeImage = null;
 let lastCells = null;
 
 // ---------- rendering ----------
@@ -120,7 +123,7 @@ function updateStats() {
 
 function renderObjectChips() {
   const entries = OBJECTS.map(([id, label]) => [id, label]);
-  if (customName) entries.push(['custom', customName.toUpperCase()]);
+  if (customName) entries.push([customKind, customName.toUpperCase()]);
   $('objects').replaceChildren(
     ...entries.map(([id, label]) => {
       const button = document.createElement('button');
@@ -129,7 +132,7 @@ function renderObjectChips() {
       button.textContent = label;
       button.setAttribute('aria-pressed', String(state.object === id));
       button.addEventListener('click', () => {
-        if (id !== 'custom') store.set({ object: id, upAxis: 'y' });
+        if (id !== customKind) store.set({ object: id, upAxis: 'y' });
       });
       return button;
     }),
@@ -141,12 +144,36 @@ function showBuiltin(id) {
   dirty = true;
 }
 
+const shortName = (name) => (name.length > 22 ? `${name.slice(0, 20)}…` : name);
+const isModelFile = (file) => MODEL_EXTENSIONS.includes(file.name.split('.').pop().toLowerCase());
+
+// One entry point for everything that is dropped or picked: a 3D model
+// (possibly with its side files) or a picture to rasterise.
 async function loadFiles(files) {
   if (!files.length || busy) return;
-  toast('LOADING MODEL…', 0);
+  const picture = !files.some(isModelFile) && files.find(isImageFile);
+  toast(picture ? 'LOADING IMAGE…' : 'LOADING MODEL…', 0);
   try {
+    if (picture) {
+      stage.setImage(await fileToCanvas(picture, 2048));
+      customName = shortName(picture.name);
+      customKind = 'image';
+      // A picture starts flat and facing the camera; a spin can be switched back on.
+      const patch = { object: 'image', upAxis: 'y' };
+      if (state.motion === 'turntable' || state.motion === 'tumble') {
+        motionBeforeImage = state.motion;
+        patch.motion = 'still';
+      }
+      stage.setView('front', false);
+      store.set(patch);
+      renderObjectChips();
+      dirty = true;
+      toast(`LOADED ${picture.name.toUpperCase()}`);
+      return;
+    }
     const { object, name, zUp } = await loadModelFiles(files);
-    customName = name.length > 22 ? `${name.slice(0, 20)}…` : name;
+    customName = shortName(name);
+    customKind = 'custom';
     const upAxis = zUp ? 'z' : 'y';
     stage.setModel(object, upAxis);
     store.set({ object: 'custom', upAxis });
@@ -155,7 +182,7 @@ async function loadFiles(files) {
     toast(`LOADED ${name.toUpperCase()}`);
   } catch (error) {
     console.error(error);
-    toast(`COULD NOT LOAD MODEL – ${error.message}`.toUpperCase(), 6000, true);
+    toast(`COULD NOT LOAD FILE – ${error.message}`.toUpperCase(), 6000, true);
   }
 }
 
@@ -232,7 +259,7 @@ let abortController = null;
 $('progress-cancel').addEventListener('click', () => abortController?.abort());
 
 function fileBase() {
-  const name = state.object === 'custom' ? customName.replace(/\.[^.]+$/, '') : state.object;
+  const name = state.object === customKind ? customName.replace(/\.[^.]+$/, '') : state.object;
   return `rastr-${name.replace(/[^a-z0-9-_]+/gi, '-').toLowerCase() || 'asset'}`;
 }
 
@@ -306,7 +333,34 @@ const actions = {
     }
   },
   loadPreset: () => filePreset.click(),
+  addIcon() {
+    if (state.icons.length >= MAX_ICONS) toast(`${MAX_ICONS} ICONS IS THE LIMIT – REMOVE ONE FIRST`, 4000, true);
+    else fileIcon.click();
+  },
+  removeIcon(id) {
+    const patch = { icons: state.icons.filter((icon) => icon.id !== id) };
+    for (let level = 1; level <= 4; level++) {
+      if (state[`shape${level}`] === `icon:${id}`) patch[`shape${level}`] = DEFAULTS[`shape${level}`];
+    }
+    store.set(patch);
+    toast('ICON REMOVED · ⌘Z TO UNDO');
+  },
 };
+
+const fileIcon = $('file-icon');
+fileIcon.addEventListener('change', async () => {
+  const file = fileIcon.files[0];
+  fileIcon.value = '';
+  if (!file) return;
+  try {
+    const icon = await createIcon(file);
+    // The new icon goes straight onto the densest level so it is visible at once.
+    store.set({ icons: [...state.icons, icon], shape4: `icon:${icon.id}` });
+    toast('ICON ADDED · SET AS L4 SHAPE');
+  } catch (error) {
+    toast(`COULD NOT ADD ICON – ${error.message}`.toUpperCase(), 6000, true);
+  }
+});
 
 // ---------- wiring ----------
 
@@ -314,9 +368,16 @@ buildPanel($('panel'), createSchema(store, actions), store);
 
 store.subscribe((keys) => {
   if (keys.includes('object')) {
-    if (state.object !== 'custom') showBuiltin(state.object);
+    if (state.object !== 'custom' && state.object !== 'image') {
+      showBuiltin(state.object);
+      // Give a model back the spin that loading a picture switched off.
+      const motion = motionBeforeImage;
+      motionBeforeImage = null;
+      if (motion && state.motion === 'still') store.set({ motion }, { history: false });
+    }
     renderObjectChips();
   }
+  if (keys.includes('icons')) ensureIcons(state.icons, () => (dirty = true));
   if (keys.includes('upAxis')) stage.setUpAxis(state.upAxis);
   if (keys.includes('aspect')) fitCanvas();
   if (keys.includes('zoom') && Math.abs(stage.zoom - state.zoom) > 0.004) stage.setZoom(state.zoom);
@@ -330,7 +391,7 @@ stage.controls.addEventListener('change', () => {
 });
 
 function resetLook() {
-  const keep = new Set(['object', 'upAxis']);
+  const keep = new Set(['object', 'upAxis', 'icons']);
   store.reset(Object.keys(state).filter((k) => !keep.has(k)));
   stage.setView('three');
   toast('RESET TO DEFAULTS');
@@ -371,6 +432,7 @@ window.addEventListener('keydown', (e) => {
 });
 
 showBuiltin(state.object);
+ensureIcons(state.icons, () => (dirty = true));
 stage.setZoom(state.zoom);
 renderObjectChips();
 fitCanvas();

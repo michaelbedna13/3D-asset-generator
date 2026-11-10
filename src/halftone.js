@@ -1,6 +1,7 @@
 // Turns the sampled tone grid into leveled cells and paints them to canvas / SVG.
 import { SHAPES, canvasSink, svgSink } from './shapes.js';
 import { inkFromLights } from './state.js';
+import { iconId, iconSprite, iconDataUrl } from './icons.js';
 
 const MIN_COVERAGE = 0.06;
 const TAU = Math.PI * 2;
@@ -103,6 +104,7 @@ export function computeCells(grid, s, phase) {
       // Dark ink covers what the light doesn't reach (linear, like print).
       // Light ink on a dark ground is lifted so a lit surface reads as solid.
       let ink = lights ? l ** LIGHT_INK_GAMMA : 1 - l;
+      if (grid.solid) ink = 1; // image used as a silhouette: everything covered is full ink
       ink = (ink - 0.5) * contrast + 0.5;
       ink = ink <= 0 ? 0 : ink >= 1 ? 1 : ink ** densityExp;
       ink *= 1 - s.edge * (1 - c);
@@ -137,25 +139,33 @@ function levelColor(s, level) {
   return s.accentLevel === level ? s.accent : s.ink;
 }
 
-function emitLevel(sink, cells, s, level, W, H) {
+// Calls `visit(cx, cy, size)` for every cell of one level. Returns the cell count.
+function eachCell(cells, s, level, W, H, visit) {
   const { cols, rows, levels, scale } = cells;
-  const shape = SHAPES[s[`shape${level}`]] || SHAPES.dot;
-  if (shape === SHAPES.none) return false;
   const px = Math.min(W, H) / cells.short;
   const ox = (W - cols * px) / 2;
   const oy = (H - rows * px) / 2;
   const size = px * (1 - s.margin) * s[`size${level}`];
-  let any = false;
+  let n = 0;
   for (let y = 0; y < rows; y++) {
     const cy = oy + (y + 0.5) * px;
     for (let x = 0; x < cols; x++) {
       const i = y * cols + x;
       if (levels[i] !== level) continue;
-      shape(sink, ox + (x + 0.5) * px, cy, size * scale[i]);
-      any = true;
+      visit(ox + (x + 0.5) * px, cy, size * scale[i]);
+      n++;
     }
   }
-  return any;
+  return n;
+}
+
+// A level is drawn either with a built-in vector shape or with an uploaded icon.
+function levelStyle(s, level) {
+  const key = s[`shape${level}`];
+  const icon = iconId(key);
+  if (icon && iconSprite(icon, levelColor(s, level), 8)) return { icon };
+  // An icon that is missing (removed, or still decoding) falls back to a dot.
+  return { shape: SHAPES[key] || SHAPES.dot };
 }
 
 export function drawCanvas(ctx, W, H, cells, s, { transparent = false } = {}) {
@@ -167,23 +177,52 @@ export function drawCanvas(ctx, W, H, cells, s, { transparent = false } = {}) {
   }
   const sink = canvasSink(ctx);
   for (let level = 1; level <= 4; level++) {
+    const { icon, shape } = levelStyle(s, level);
+    const color = levelColor(s, level);
+    if (icon) {
+      ctx.imageSmoothingQuality = 'high';
+      eachCell(cells, s, level, W, H, (cx, cy, size) => {
+        if (size < 0.5) return;
+        ctx.drawImage(iconSprite(icon, color, size), cx - size / 2, cy - size / 2, size, size);
+      });
+      continue;
+    }
+    if (shape === SHAPES.none) continue;
     ctx.beginPath();
-    if (!emitLevel(sink, cells, s, level, W, H)) continue;
-    ctx.fillStyle = levelColor(s, level);
+    if (!eachCell(cells, s, level, W, H, (cx, cy, size) => shape(sink, cx, cy, size))) continue;
+    ctx.fillStyle = color;
     ctx.fill('evenodd');
   }
 }
 
+const f = (n) => Math.round(n * 100) / 100;
+
 export function toSVG(W, H, cells, s, { transparent = false } = {}) {
-  let out =
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">\n` +
-    `<clipPath id="frame"><rect width="${W}" height="${H}"/></clipPath>\n`;
-  if (!transparent) out += `<rect id="background" width="${W}" height="${H}" fill="${s.bg}"/>\n`;
-  out += '<g clip-path="url(#frame)" fill-rule="evenodd">\n';
+  let defs = `<clipPath id="frame"><rect width="${W}" height="${H}"/></clipPath>\n`;
+  let body = '';
   for (let level = 1; level <= 4; level++) {
+    const { icon, shape } = levelStyle(s, level);
+    const color = levelColor(s, level);
+    if (icon) {
+      // Uploaded icons are bitmaps: embedded once, tinted, and instanced per cell.
+      let uses = '';
+      eachCell(cells, s, level, W, H, (cx, cy, size) => {
+        uses += `<use xlink:href="#icon-${level}" transform="translate(${f(cx - size / 2)} ${f(cy - size / 2)}) scale(${f(size)})"/>`;
+      });
+      if (!uses) continue;
+      defs += `<image id="icon-${level}" width="1" height="1" preserveAspectRatio="none" xlink:href="${iconDataUrl(icon, color)}"/>\n`;
+      body += `<g id="level-${level}">${uses}</g>\n`;
+      continue;
+    }
+    if (shape === SHAPES.none) continue;
     const sink = svgSink();
-    if (!emitLevel(sink, cells, s, level, W, H)) continue;
-    out += `<path id="level-${level}" fill="${levelColor(s, level)}" d="${sink}"/>\n`;
+    if (!eachCell(cells, s, level, W, H, (cx, cy, size) => shape(sink, cx, cy, size))) continue;
+    body += `<path id="level-${level}" fill="${color}" d="${sink}"/>\n`;
   }
-  return `${out}</g>\n</svg>\n`;
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" ` +
+    `width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">\n<defs>\n${defs}</defs>\n` +
+    (transparent ? '' : `<rect id="background" width="${W}" height="${H}" fill="${s.bg}"/>\n`) +
+    `<g clip-path="url(#frame)" fill-rule="evenodd">\n${body}</g>\n</svg>\n`
+  );
 }

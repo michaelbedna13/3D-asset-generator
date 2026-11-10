@@ -14,7 +14,7 @@ const extension = (name) => name.split('.').pop().toLowerCase();
 export async function loadModelFiles(fileList) {
   const files = [...fileList];
   const main = files.find((f) => MODEL_EXTENSIONS.includes(extension(f.name)));
-  if (!main) throw new Error('Unsupported file – use .glb, .gltf, .obj or .stl');
+  if (!main) throw new Error('Unsupported file – use .glb, .gltf, .obj, .stl or an image');
 
   const urls = new Map(files.map((f) => [f.name, URL.createObjectURL(f)]));
   const manager = new THREE.LoadingManager();

@@ -89,6 +89,7 @@ export class Stage {
     this.applyDistanceLimits();
     this.tween = null;
     this.model = null;
+    this.flat = false;
   }
 
   // Distance at which the unit bounding sphere just fills the frame.
@@ -124,6 +125,7 @@ export class Stage {
     this.baseDistance = this.fitDistance(aspect);
     this.applyDistanceLimits();
     this.setZoom(zoom);
+    if (this.flat) this.setUpAxis('y'); // a picture is fitted to the frame's shape
   }
 
   setView(name, animate = true) {
@@ -156,7 +158,24 @@ export class Stage {
     return this.controls.update() || changed;
   }
 
-  setModel(object, upAxis = 'y') {
+  // A picture becomes an unlit, double-sided card in the scene, so camera,
+  // motion and export work on it exactly as they do on a model.
+  setImage(canvas) {
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
+    const k = 2 / Math.max(canvas.width, canvas.height);
+    const card = new THREE.Mesh(
+      new THREE.PlaneGeometry(canvas.width * k, canvas.height * k),
+      // NoBlending writes the texture's own alpha straight into the render
+      // target, which is what the sampler reads as coverage.
+      new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide, blending: THREE.NoBlending }),
+    );
+    this.setModel(card, 'y', true);
+  }
+
+  setModel(object, upAxis = 'y', flat = false) {
+    this.flat = flat;
     if (this.model) {
       this.fit.clear();
       disposeObject(this.model);
@@ -198,7 +217,14 @@ export class Stage {
     });
     const sphere = Math.sqrt(r2);
     // Skinned or instanced meshes can sit far from their rest pose; trust the box then.
-    const radius = sphere > boxRadius * 0.4 ? Math.min(sphere, boxRadius) : boxRadius;
+    let radius = sphere > boxRadius * 0.4 ? Math.min(sphere, boxRadius) : boxRadius;
+    // A picture is fitted to the frame rectangle instead, so it fills the
+    // frame edge to edge when seen from the front (the short side spans 2 units).
+    if (this.flat) {
+      const frameW = 2 * Math.max(1, this.aspect);
+      const frameH = 2 * Math.max(1, 1 / this.aspect);
+      radius = Math.max(size.x / frameW, size.y / frameH) || 1;
+    }
     this.fit.scale.setScalar(1 / radius);
     this.fit.position.copy(center).multiplyScalar(-1 / radius);
     this.fit.add(this.orient);
@@ -264,13 +290,13 @@ export class Stage {
     }
 
     const r = this.renderer;
-    this.scene.overrideMaterial = s.material === 'clay' ? this.clay : null;
+    this.scene.overrideMaterial = s.material === 'clay' && !this.flat ? this.clay : null;
     r.setRenderTarget(this.rtColor);
     r.clear();
     r.render(this.scene, cam);
     r.readRenderTargetPixels(this.rtColor, 0, 0, w, h, this.colorBuf);
 
-    const wantDepth = s.ao > 0;
+    const wantDepth = s.ao > 0 && !this.flat;
     if (wantDepth) {
       this.scene.overrideMaterial = this.depthMaterial;
       r.setRenderTarget(this.rtDepth);
@@ -281,6 +307,7 @@ export class Stage {
     this.scene.overrideMaterial = null;
     r.setRenderTarget(null);
     grid.depth = wantDepth ? grid.depthStore : null;
+    grid.solid = this.flat && s.imageTone === 'solid';
 
     const cb = this.colorBuf;
     const db = this.depthBuf;

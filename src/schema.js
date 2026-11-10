@@ -2,10 +2,55 @@
 import { PAIRINGS, SHAPE_DEFAULTS } from './state.js';
 import { SHAPE_OPTIONS } from './shapes.js';
 
+const shapeOptions = (s) => [
+  ...SHAPE_OPTIONS,
+  ...s.icons.map((icon) => [`icon:${icon.id}`, `ICON · ${icon.name.toUpperCase()}`]),
+];
+
 const levelRows = (n) => [
-  { type: 'select', key: `shape${n}`, label: `L${n} SHAPE`, options: SHAPE_OPTIONS },
+  { type: 'select', key: `shape${n}`, label: `L${n} SHAPE`, options: shapeOptions },
   { type: 'slider', key: `size${n}`, label: `L${n} SIZE`, min: 0.1, max: 1.2, step: 0.01 },
 ];
+
+const isImage = (s) => s.object === 'image';
+const isModel = (s) => s.object !== 'image';
+
+// The library of uploaded cell icons: a thumbnail per icon (click to remove)
+// and a button that opens the file picker.
+function iconLibrary(actions) {
+  return {
+    type: 'custom',
+    build(store, el) {
+      const list = el('div', { class: 'icon-list' });
+      const node = el('div', { class: 'icons' }, [el('span', { class: 'icons-title', text: 'YOUR ICONS' }), list]);
+      let signature = null;
+      const sync = () => {
+        const { icons } = store.state;
+        const next = icons.map((icon) => icon.id).join(',');
+        if (next === signature) return;
+        signature = next;
+        list.replaceChildren(
+          ...icons.map((icon) => {
+            const img = el('img', { src: icon.data, alt: '' });
+            return el(
+              'button',
+              {
+                type: 'button',
+                class: 'icon-chip',
+                title: `Remove ${icon.name}`,
+                'aria-label': `Remove icon ${icon.name}`,
+                onclick: () => actions.removeIcon(icon.id),
+              },
+              [img, el('span', { class: 'icon-x', text: '×', 'aria-hidden': 'true' })],
+            );
+          }),
+          el('button', { type: 'button', class: 'btn', text: '+ ADD ICON', onclick: actions.addIcon }),
+        );
+      };
+      return { node, sync };
+    },
+  };
+}
 
 export function createSchema(store, actions) {
   return [
@@ -62,10 +107,6 @@ export function createSchema(store, actions) {
             { type: 'slider', key: 'contrast', label: 'CONTRAST', min: 0, max: 1, step: 0.01 },
             { type: 'slider', key: 'dither', label: 'DITHER', min: 0, max: 1, step: 0.01 },
             { type: 'slider', key: 'edge', label: 'EDGE FADE', min: 0, max: 1, step: 0.01 },
-            ...levelRows(1),
-            ...levelRows(2),
-            ...levelRows(3),
-            ...levelRows(4),
           ],
         },
         {
@@ -89,16 +130,41 @@ export function createSchema(store, actions) {
             { type: 'slider', key: 'l2', label: 'L2 START', min: 0, max: 1, step: 0.01 },
             { type: 'slider', key: 'l3', label: 'L3 START', min: 0, max: 1, step: 0.01 },
             { type: 'slider', key: 'l4', label: 'L4 START', min: 0, max: 1, step: 0.01 },
-            { type: 'slider', key: 'ao', label: 'CONTACT AO', min: 0, max: 1, step: 0.01 },
+            { type: 'slider', key: 'ao', label: 'CONTACT AO', min: 0, max: 1, step: 0.01, visible: isModel },
           ],
         },
         {
-          title: 'LIGHTING',
+          title: 'LEVEL SHAPES',
           items: [
+            iconLibrary(actions),
+            ...levelRows(1),
+            ...levelRows(2),
+            ...levelRows(3),
+            ...levelRows(4),
+            {
+              type: 'note',
+              text: 'Add your own icon (SVG or PNG) and pick it as the shape of any level. It takes the level colour.',
+            },
+          ],
+        },
+        {
+          title: 'LIGHT & TONE',
+          items: [
+            {
+              type: 'select',
+              key: 'imageTone',
+              label: 'IMAGE TONE',
+              visible: isImage,
+              options: [
+                ['tone', 'BRIGHTNESS'],
+                ['solid', 'SOLID SHAPE'],
+              ],
+            },
             {
               type: 'select',
               key: 'lighting',
               label: 'LIGHTING',
+              visible: isModel,
               options: [
                 ['studio', 'STUDIO'],
                 ['soft', 'SOFT'],
@@ -108,13 +174,14 @@ export function createSchema(store, actions) {
                 ['flat', 'FLAT'],
               ],
             },
-            { type: 'slider', key: 'lightAngle', label: 'ANGLE', min: -180, max: 180, step: 1 },
+            { type: 'slider', key: 'lightAngle', label: 'ANGLE', min: -180, max: 180, step: 1, visible: isModel },
             { type: 'slider', key: 'exposure', label: 'EXPOSURE', min: 0.2, max: 3, step: 0.01 },
-            { type: 'check', key: 'shadows', label: 'SHADOWS' },
+            { type: 'check', key: 'shadows', label: 'SHADOWS', visible: isModel },
             {
               type: 'select',
               key: 'material',
               label: 'MATERIAL',
+              visible: isModel,
               options: [
                 ['clay', 'CLAY'],
                 ['original', 'ORIGINAL'],
@@ -141,6 +208,7 @@ export function createSchema(store, actions) {
               type: 'select',
               key: 'upAxis',
               label: 'UP AXIS',
+              visible: isModel,
               options: [
                 ['y', 'Y UP'],
                 ['z', 'Z UP'],
@@ -271,7 +339,7 @@ export function createSchema(store, actions) {
         },
         {
           title: 'LIGHT',
-          items: [{ type: 'check', key: 'lightOrbit', label: 'LIGHT ORBIT' }],
+          items: [{ type: 'check', key: 'lightOrbit', label: 'LIGHT ORBIT', visible: isModel }],
         },
         {
           title: 'TONE FX',

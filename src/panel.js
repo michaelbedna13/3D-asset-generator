@@ -63,7 +63,9 @@ const builders = {
     const select = el('select', { id });
     const sync = () => {
       const options = typeof item.options === 'function' ? item.options(store.state) : item.options;
-      if (select.options.length !== options.length) {
+      const signature = options.map(([value, label]) => `${value}=${label}`).join('|');
+      if (select._signature !== signature) {
+        select._signature = signature;
         select.replaceChildren(...options.map(([value, label]) => el('option', { value: String(value), text: label })));
         select._values = options.map(([value]) => value);
       }
@@ -131,6 +133,11 @@ const builders = {
       ),
     );
     return { node, sync() {} };
+  },
+
+  // Escape hatch for one-off controls: the schema supplies its own builder.
+  custom(item, store) {
+    return item.build(store, el);
   },
 
   note(item) {

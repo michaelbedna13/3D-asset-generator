@@ -44,6 +44,8 @@ export const DEFAULTS = {
   inkFrom: 'auto',
 
   ...SHAPE_DEFAULTS,
+  // uploaded cell icons: [{ id, name, data }] – a shape key of `icon:<id>` uses one
+  icons: [],
 
   // lighting
   lighting: 'studio',
@@ -51,6 +53,7 @@ export const DEFAULTS = {
   exposure: 1,
   shadows: true,
   material: 'clay',
+  imageTone: 'tone',
 
   // scene
   object: 'knot',
@@ -90,6 +93,8 @@ export const ASPECTS = {
 const STORAGE_KEY = 'rastr-studio:v1';
 // Keys that describe the session rather than the look – not worth an undo step.
 const NO_HISTORY = new Set(['zoom', 'play']);
+// What is on stage is not part of the look: undo never swaps the loaded model or picture.
+const SESSION = new Set(['object', 'upAxis', 'zoom', 'play']);
 
 export function createStore() {
   const state = { ...DEFAULTS };
@@ -113,7 +118,8 @@ export function createStore() {
 
   function applyKnown(target, patch) {
     for (const key of Object.keys(DEFAULTS)) {
-      if (key in patch && typeof patch[key] === typeof DEFAULTS[key]) target[key] = patch[key];
+      if (!(key in patch) || typeof patch[key] !== typeof DEFAULTS[key]) continue;
+      target[key] = key === 'icons' ? cleanIcons(patch[key]) : patch[key];
     }
   }
 
@@ -159,7 +165,7 @@ export function createStore() {
   }
 
   function restore(snapshot) {
-    const keys = Object.keys(DEFAULTS).filter((k) => state[k] !== snapshot[k]);
+    const keys = Object.keys(DEFAULTS).filter((k) => !SESSION.has(k) && state[k] !== snapshot[k]);
     for (const k of keys) state[k] = snapshot[k];
     if (keys.length) emit(keys);
   }
@@ -200,9 +206,27 @@ export function createStore() {
       if (!params || typeof params !== 'object') throw new Error('Not a preset file');
       const next = { ...state };
       applyKnown(next, params);
+      // An uploaded model or picture is not part of a preset file.
+      if (next.object === 'custom' || next.object === 'image') next.object = state.object;
       set(next);
     },
   };
+}
+
+// Icons come from storage and preset files, so only well-formed entries are kept.
+function cleanIcons(list) {
+  if (!Array.isArray(list)) return [];
+  return list
+    .filter(
+      (icon) =>
+        icon &&
+        typeof icon.id === 'string' &&
+        /^[a-z0-9]{1,16}$/.test(icon.id) &&
+        typeof icon.data === 'string' &&
+        icon.data.startsWith('data:image/png;base64,'),
+    )
+    .slice(0, 6)
+    .map((icon) => ({ id: icon.id, name: String(icon.name || 'icon').slice(0, 24), data: icon.data }));
 }
 
 function luminance(hex) {
