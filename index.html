@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0c0d0f" />
+    <meta name="description" content="Turn any 3D model into a branded halftone-shape graphic and export it as PNG, SVG, GIF or MP4." />
+    <title>RASTR Studio</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%230c0d0f'/%3E%3Cg fill='%23d7ff3e'%3E%3Crect x='2' y='2' width='5' height='5' rx='1'/%3E%3Crect x='9' y='9' width='5' height='5' rx='1'/%3E%3Ccircle cx='11.5' cy='4.5' r='1.5'/%3E%3Ccircle cx='4.5' cy='11.5' r='1.5'/%3E%3C/g%3E%3C/svg%3E" />
+  </head>
+  <body>
+    <div id="app">
+      <main class="stage">
+        <header class="topbar">
+          <div class="brand">
+            <svg class="mark" viewBox="0 0 16 16" aria-hidden="true">
+              <rect x="1" y="1" width="6" height="6" rx="1.4" />
+              <rect x="9" y="9" width="6" height="6" rx="1.4" />
+              <circle cx="12" cy="4" r="1.7" />
+              <circle cx="4" cy="12" r="1.7" />
+            </svg>
+            <h1>RASTR <span>STUDIO</span></h1>
+          </div>
+          <div class="views" id="views" role="group" aria-label="Camera view"></div>
+        </header>
+
+        <div class="viewport" id="viewport">
+          <canvas id="view" tabindex="0" aria-label="Halftone preview. Drag to orbit, scroll or pinch to zoom."></canvas>
+          <div class="drop" id="drop" hidden><span>DROP MODEL TO LOAD</span></div>
+          <div class="progress" id="progress" hidden>
+            <div class="progress-card" role="status" aria-live="polite">
+              <span id="progress-label">EXPORTING</span>
+              <div class="bar"><i id="progress-bar"></i></div>
+              <button type="button" class="btn" id="progress-cancel">CANCEL</button>
+            </div>
+          </div>
+          <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+        </div>
+
+        <footer class="dock">
+          <div class="dock-row">
+            <button type="button" class="btn primary" id="swap">SWAP 3D MODEL</button>
+            <div class="objects" id="objects" role="group" aria-label="Built-in objects"></div>
+          </div>
+          <div class="status">
+            <span id="stats"></span>
+            <span class="keys">DROP .GLB / .GLTF / .OBJ / .STL ANYWHERE · ⌘Z UNDO · E PNG · G GIF · R RESET · SPACE PLAY</span>
+          </div>
+        </footer>
+      </main>
+
+      <aside class="panel" id="panel" aria-label="Settings"></aside>
+    </div>
+
+    <input type="file" id="file-model" hidden multiple />
+    <input type="file" id="file-preset" hidden accept=".json,application/json" />
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

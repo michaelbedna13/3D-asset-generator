@@ -1,0 +1,23 @@
+{
+  "name": "rastr-studio",
+  "private": true,
+  "version": "0.1.0",
+  "description": "RASTR Studio – 3D asset generator that turns any 3D model into a branded halftone-shape graphic (PNG / SVG / GIF / MP4).",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "build:single": "vite build --mode single",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@fontsource-variable/jetbrains-mono": "^5.3.0",
+    "gifenc": "^1.0.3",
+    "mp4-muxer": "^5.2.2",
+    "three": "^0.187.0"
+  },
+  "devDependencies": {
+    "vite": "^8.3.7",
+    "vite-plugin-singlefile": "^2.3.4"
+  }
+}
