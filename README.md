@@ -21,7 +21,8 @@ npm run build:single   # celá appka jako jeden soubor dist-single/index.html
 | --- | --- |
 | **Modely** | 9 vestavěných objektů, vlastní `.glb` / `.gltf` / `.obj` / `.stl` přes tlačítko `LOAD MODEL / IMAGE` nebo přetažením (i `.gltf` + `.bin` + textury najednou, Draco i Meshopt komprese) |
 | **Obrázky** | fotka nebo logo (PNG, JPG, WebP, SVG…) jako předloha místo 3D modelu; režim `BRIGHTNESS` (rastr podle jasu) nebo `SOLID SHAPE` (silueta podle průhlednosti) |
-| **Point cloud** | druhý styl pro obrázky (`IMAGE → STYLE → POINT CLOUD`): až 520 tisíc svítících bodů s hloubkou, orbit kamerou, rozptyl, animované rozlétnutí a složení (`PULSE` / `SWEEP`), drift, vinětace a zrno; hloubka se odhaduje z jasu, nebo jde nahrát vlastní hloubková mapa |
+| **Point cloud** | druhý styl pro obrázky (`IMAGE → STYLE → POINT CLOUD`): až 520 tisíc svítících bodů s hloubkou, orbit kamerou, rozptyl, animované rozlétnutí a složení (`PULSE` / `SWEEP`), drift, vinětace a zrno |
+| **Hloubka** | výchozí odhad z jasu · `ESTIMATE DEPTH` spočítá skutečnou hloubku modelem přímo v prohlížeči · vlastní hloubková mapa (`LOAD DEPTH MAP`) · uložení mapy jako PNG (`SAVE DEPTH MAP`) |
 | **Colours** | 8 barevných párů, vlastní barva popředí a pozadí, volitelná akcentní barva pro jednu úroveň |
 | **Shapes** | velikost buňky, okraj, 4 tónové úrovně s vlastním prahem, tvarem a velikostí (tečka, kroužek, křížek, plus, čtverec, kosočtverec…), banding, dither, edge fade, contact AO |
 | **Vlastní ikony** | až 6 nahraných ikon (SVG / PNG) použitelných jako tvar kterékoli úrovně; obarví se barvou úrovně a ukládají se do presetu |
@@ -53,6 +54,29 @@ npm run build:single   # celá appka jako jeden soubor dist-single/index.html
 Velikost buňky se udává v px vůči kratší straně 1024, takže vzhled je stejný v
 každém rozlišení i formátu.
 
+## Odhad hloubky (`ESTIMATE DEPTH`)
+
+Tlačítko je u stylu point cloud. Použije model **Depth Anything V2 Small**
+(licence Apache-2.0, 8bitová ONNX verze od `onnx-community`) a běží celé v
+prohlížeči přes ONNX Runtime (WebAssembly) ve workeru:
+
+- při prvním použití se z Hugging Face stáhne model (27 MB) a uloží se do
+  mezipaměti prohlížeče, další použití už nic nestahuje;
+- obrázek zařízení neopouští, na server se nic neposílá;
+- samotný výpočet trvá řádově sekundy na počítači, na telefonu déle;
+- výsledná mapa jde uložit (`SAVE DEPTH MAP`) a příště rovnou nahrát.
+
+Funkce je jen v běžném buildu (`npm run dev`, `npm run build`). V jednosouborové
+verzi (`build:single`) chybí, protože ta si model stáhnout nemůže – tam poslouží
+odhad z jasu nebo nahraná hloubková mapa.
+
+## Nasazení
+
+`npm run build` vytvoří statický web v `dist/`, který stačí nahrát na jakýkoli
+hosting. Pro GitHub Pages je připravený workflow `.github/workflows/pages.yml`:
+po sloučení do `main` a zapnutí *Settings → Pages → Source → GitHub Actions* se
+appka při každém pushi sama sestaví a zveřejní.
+
 ## Vlastní brand
 
 Barevné páry a výchozí hodnoty jsou v `src/state.js` (`PAIRINGS`,
@@ -67,7 +91,5 @@ předat jako preset (`SAVE PRESET` → JSON, který se načte přetažením do o
 - Vlastní ikony se do SVG exportu vkládají jako bitmapa (512 px), vestavěné tvary
   zůstávají čistý vektor.
 - Point cloud nejde exportovat do SVG (statisíce bodů), použijte PNG / GIF / MP4.
-  Hloubka z jasu je jen odhad: světlé = blízko (jde otočit). Pro skutečnou hloubku
-  nahrajte hloubkovou mapu téhož obrázku (bílá = blízko), třeba z modelu Depth Anything.
 - Obrázek je ve scéně jako plochá karta, takže na něj fungují pohledy, zoom i
   animace; světla, stíny a contact AO se u něj nepoužívají.

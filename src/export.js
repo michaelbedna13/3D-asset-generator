@@ -23,7 +23,7 @@ export function frameSize(state, scale = 1, even = false) {
 // Inside a claude.ai artifact the page can't start a download on its own; the
 // host offers a `downloads` capability instead. Everywhere else `window.claude`
 // doesn't exist and a plain download link is used.
-const hosted = typeof window !== 'undefined' && typeof window.claude?.use === 'function';
+export const hosted = typeof window !== 'undefined' && typeof window.claude?.use === 'function';
 const hostDownloads = hosted ? window.claude.use('downloads').catch(() => null) : null;
 
 // Resolves 'saved', or 'declined' when the viewer dismisses the host's prompt.

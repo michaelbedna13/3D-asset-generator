@@ -158,18 +158,31 @@ export function createSchema(store, actions) {
               columns: 2,
               visible: isPoints,
               buttons: [
+                ...(actions.estimateDepth
+                  ? [
+                      {
+                        label: 'ESTIMATE DEPTH',
+                        primary: true,
+                        onClick: actions.estimateDepth,
+                        title: 'Work out real depth with a depth model running in this browser',
+                      },
+                    ]
+                  : []),
                 {
                   label: 'LOAD DEPTH MAP',
                   onClick: actions.loadDepthMap,
                   title: 'Use a greyscale depth image (white = near) instead of the automatic depth',
                 },
-                { label: 'AUTO DEPTH', onClick: actions.clearDepthMap, title: 'Go back to depth estimated from brightness' },
+                { label: 'SAVE DEPTH MAP', onClick: actions.saveDepthMap, title: 'Download the depth map in use as a PNG' },
+                { label: 'AUTO DEPTH', onClick: actions.clearDepthMap, title: 'Go back to depth guessed from brightness' },
               ],
             },
             {
               type: 'note',
               visible: isPoints,
-              text: 'Depth is estimated from brightness. For true depth, load a depth map of the same picture.',
+              text: actions.estimateDepth
+                ? 'Depth starts as a guess from brightness. ESTIMATE DEPTH runs a depth model in your browser: a 27 MB download the first time, and the picture never leaves your device.'
+                : 'Depth is guessed from brightness. For true depth, load a depth map of the same picture (white = near).',
             },
           ],
         },

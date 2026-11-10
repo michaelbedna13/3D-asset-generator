@@ -7,7 +7,7 @@ import { createSchema } from './schema.js';
 import { OBJECTS, buildObject } from './objects.js';
 import { loadModelFiles, MODEL_EXTENSIONS } from './loaders.js';
 import { createIcon, ensureIcons, fileToCanvas, isImageFile, MAX_ICONS } from './icons.js';
-import { exportPNG, exportSVG, exportGIF, exportMP4, download, frameSize } from './export.js';
+import { exportPNG, exportSVG, exportGIF, exportMP4, download, frameSize, hosted } from './export.js';
 
 const $ = (id) => document.getElementById(id);
 const store = createStore();
@@ -377,8 +377,68 @@ filePreset.addEventListener('change', () => {
   filePreset.value = '';
 });
 
+// The depth model needs to download its weights, which neither the single-file
+// build nor a claude.ai artifact can do, so the feature is left out there.
+const loadDepthModule = import.meta.env.MODE === 'single' || hosted ? null : () => import('./depth.js');
+
+async function estimateDepth() {
+  if (busy || !stage.image) return;
+  busy = true;
+  abortController = new AbortController();
+  const label = $('progress-label');
+  const bar = $('progress-bar');
+  label.textContent = 'LOADING DEPTH MODEL';
+  bar.style.width = '0%';
+  $('progress').hidden = false;
+  try {
+    const { estimateDepth: run } = await loadDepthModule();
+    const map = await run(stage.image.canvas, {
+      signal: abortController.signal,
+      onStage(name, progress) {
+        if (name === 'download') {
+          const pct = Math.round(progress * 100);
+          label.textContent = `DOWNLOADING DEPTH MODEL ${pct}%`;
+          bar.style.width = `${pct}%`;
+        } else {
+          label.textContent = 'ESTIMATING DEPTH · CAN TAKE A MINUTE';
+          bar.style.width = '100%';
+        }
+      },
+    });
+    stage.setDepthMap(map);
+    if (state.ptDepthDir !== 'bright') store.set({ ptDepthDir: 'bright' }); // the map is white = near
+    toast('DEPTH ESTIMATED');
+  } catch (error) {
+    if (error.name === 'AbortError') toast('DEPTH ESTIMATION CANCELLED');
+    else {
+      console.error(error);
+      toast(`DEPTH ESTIMATION FAILED – ${error.message}`.toUpperCase(), 7000, true);
+    }
+  } finally {
+    $('progress').hidden = true;
+    abortController = null;
+    busy = false;
+    dirty = true;
+    lastTime = performance.now();
+  }
+}
+
 const actions = {
   export: runExport,
+  estimateDepth: loadDepthModule ? estimateDepth : null,
+  async saveDepthMap() {
+    const map = stage.image?.depthMap;
+    if (!map) {
+      toast('NO DEPTH MAP YET – ESTIMATE OR LOAD ONE FIRST', 4000, true);
+      return;
+    }
+    try {
+      const blob = await new Promise((resolve) => map.toBlob(resolve, 'image/png'));
+      if ((await download(blob, `${fileBase()}-depth.png`)) === 'saved') toast('DEPTH MAP SAVED');
+    } catch (error) {
+      toast(`COULD NOT SAVE DEPTH MAP – ${error.message}`.toUpperCase(), 6000, true);
+    }
+  },
   async savePreset() {
     try {
       const blob = new Blob([store.exportPreset()], { type: 'application/json' });
