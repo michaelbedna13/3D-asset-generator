@@ -154,6 +154,7 @@ function row(label, id, controls, extra = '') {
 
 export function buildPanel(root, tabs, store) {
   const bound = [];
+  const sections = [];
   const tabButtons = [];
   const pages = [];
 
@@ -197,6 +198,7 @@ export function buildPanel(root, tabs, store) {
       }
       const details = el('details', { class: 'section' }, [el('summary', { text: section.title }), body]);
       details.open = section.open !== false;
+      if (section.visible) sections.push({ node: details, visible: section.visible });
       page.append(details);
     }
     pages.push(page);
@@ -208,6 +210,7 @@ export function buildPanel(root, tabs, store) {
       sync();
       if (item.visible) node.hidden = !item.visible(store.state);
     }
+    for (const { node, visible } of sections) node.hidden = !visible(store.state);
   };
   refresh();
   setTab(tabs[0].id);

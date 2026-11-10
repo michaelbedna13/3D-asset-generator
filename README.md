@@ -21,6 +21,7 @@ npm run build:single   # celá appka jako jeden soubor dist-single/index.html
 | --- | --- |
 | **Modely** | 9 vestavěných objektů, vlastní `.glb` / `.gltf` / `.obj` / `.stl` přes tlačítko `LOAD MODEL / IMAGE` nebo přetažením (i `.gltf` + `.bin` + textury najednou, Draco i Meshopt komprese) |
 | **Obrázky** | fotka nebo logo (PNG, JPG, WebP, SVG…) jako předloha místo 3D modelu; režim `BRIGHTNESS` (rastr podle jasu) nebo `SOLID SHAPE` (silueta podle průhlednosti) |
+| **Point cloud** | druhý styl pro obrázky (`IMAGE → STYLE → POINT CLOUD`): až 520 tisíc svítících bodů s hloubkou, orbit kamerou, rozptyl, animované rozlétnutí a složení (`PULSE` / `SWEEP`), drift, vinětace a zrno; hloubka se odhaduje z jasu, nebo jde nahrát vlastní hloubková mapa |
 | **Colours** | 8 barevných párů, vlastní barva popředí a pozadí, volitelná akcentní barva pro jednu úroveň |
 | **Shapes** | velikost buňky, okraj, 4 tónové úrovně s vlastním prahem, tvarem a velikostí (tečka, kroužek, křížek, plus, čtverec, kosočtverec…), banding, dither, edge fade, contact AO |
 | **Vlastní ikony** | až 6 nahraných ikon (SVG / PNG) použitelných jako tvar kterékoli úrovně; obarví se barvou úrovně a ukládají se do presetu |
@@ -44,7 +45,8 @@ npm run build:single   # celá appka jako jeden soubor dist-single/index.html
    occlusion z hloubky, ditheru a animovaných efektů) a buňka dostane úroveň 0–4.
 3. **`src/shapes.js`** – stejná geometrie tvarů se kreslí do canvasu i do SVG,
    takže náhled, rastrové exporty a vektor jsou totožné. Nahrané ikony řeší
-   **`src/icons.js`** (ořez, převod na masku, obarvení).
+   **`src/icons.js`** (ořez, převod na masku, obarvení). Styl point cloud je
+   samostatně v **`src/cloud.js`** (vzorkování obrázku, odhad hloubky, shader).
 4. **`src/export.js`** – animace se renderují snímek po snímku v přesných fázích
    smyčky (GIF přes `gifenc`, MP4 přes WebCodecs + `mp4-muxer`).
 
@@ -64,5 +66,8 @@ předat jako preset (`SAVE PRESET` → JSON, který se načte přetažením do o
 - GIF má časování po 10 ms, proto jsou na výběr jen 10 / 20 / 25 fps.
 - Vlastní ikony se do SVG exportu vkládají jako bitmapa (512 px), vestavěné tvary
   zůstávají čistý vektor.
+- Point cloud nejde exportovat do SVG (statisíce bodů), použijte PNG / GIF / MP4.
+  Hloubka z jasu je jen odhad: světlé = blízko (jde otočit). Pro skutečnou hloubku
+  nahrajte hloubkovou mapu téhož obrázku (bílá = blízko), třeba z modelu Depth Anything.
 - Obrázek je ve scéně jako plochá karta, takže na něj fungují pohledy, zoom i
   animace; světla, stíny a contact AO se u něj nepoužívají.

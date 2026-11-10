@@ -14,6 +14,9 @@ const levelRows = (n) => [
 
 const isImage = (s) => s.object === 'image';
 const isModel = (s) => s.object !== 'image';
+const isPoints = (s) => s.object === 'image' && s.render === 'points';
+const isRaster = (s) => !isPoints(s);
+const isImageRaster = (s) => isImage(s) && isRaster(s);
 
 // The library of uploaded cell icons: a thumbnail per icon (click to remove)
 // and a button that opens the file picker.
@@ -78,8 +81,102 @@ export function createSchema(store, actions) {
           ],
         },
         {
+          title: 'IMAGE',
+          visible: isImage,
+          items: [
+            {
+              type: 'select',
+              key: 'render',
+              label: 'STYLE',
+              options: [
+                ['raster', 'SHAPE RASTER'],
+                ['points', 'POINT CLOUD'],
+              ],
+              onSelect: actions.setRender,
+            },
+            {
+              type: 'select',
+              key: 'imageTone',
+              label: 'IMAGE TONE',
+              visible: isImageRaster,
+              options: [
+                ['tone', 'BRIGHTNESS'],
+                ['solid', 'SOLID SHAPE'],
+              ],
+            },
+            {
+              type: 'select',
+              key: 'ptCount',
+              label: 'POINTS',
+              visible: isPoints,
+              options: [
+                [65000, '65 K'],
+                [130000, '130 K'],
+                [260000, '260 K'],
+                [520000, '520 K'],
+              ],
+            },
+            { type: 'slider', key: 'ptSize', label: 'POINT SIZE', min: 0.1, max: 2.5, step: 0.01, visible: isPoints },
+            { type: 'slider', key: 'ptDepth', label: 'DEPTH', min: 0, max: 2, step: 0.01, visible: isPoints },
+            {
+              type: 'select',
+              key: 'ptDepthDir',
+              label: 'NEAR IS',
+              visible: isPoints,
+              options: [
+                ['bright', 'BRIGHT'],
+                ['dark', 'DARK'],
+              ],
+            },
+            { type: 'slider', key: 'ptCut', label: 'CUTOFF', min: 0, max: 0.9, step: 0.01, visible: isPoints },
+            { type: 'slider', key: 'ptScatter', label: 'SCATTER', min: 0, max: 1, step: 0.01, visible: isPoints },
+            {
+              type: 'select',
+              key: 'ptColor',
+              label: 'COLOUR',
+              visible: isPoints,
+              options: [
+                ['image', 'FROM IMAGE'],
+                ['ink', 'HIGHLIGHT'],
+              ],
+            },
+            {
+              type: 'select',
+              key: 'ptBlend',
+              label: 'BLEND',
+              visible: isPoints,
+              options: [
+                ['auto', 'AUTO'],
+                ['glow', 'GLOW'],
+                ['solid', 'SOLID'],
+              ],
+            },
+            { type: 'slider', key: 'vignette', label: 'VIGNETTE', min: 0, max: 1, step: 0.01, visible: isPoints },
+            { type: 'slider', key: 'grain', label: 'GRAIN', min: 0, max: 1, step: 0.01, visible: isPoints },
+            {
+              type: 'buttons',
+              columns: 2,
+              visible: isPoints,
+              buttons: [
+                {
+                  label: 'LOAD DEPTH MAP',
+                  onClick: actions.loadDepthMap,
+                  title: 'Use a greyscale depth image (white = near) instead of the automatic depth',
+                },
+                { label: 'AUTO DEPTH', onClick: actions.clearDepthMap, title: 'Go back to depth estimated from brightness' },
+              ],
+            },
+            {
+              type: 'note',
+              visible: isPoints,
+              text: 'Depth is estimated from brightness. For true depth, load a depth map of the same picture.',
+            },
+          ],
+        },
+        {
           title: 'ADVANCED',
           open: false,
+          visible: isRaster,
           items: [
             {
               type: 'select',
@@ -111,6 +208,7 @@ export function createSchema(store, actions) {
         },
         {
           title: 'SHAPES',
+          visible: isRaster,
           items: [
             {
               type: 'buttons',
@@ -135,6 +233,7 @@ export function createSchema(store, actions) {
         },
         {
           title: 'LEVEL SHAPES',
+          visible: isRaster,
           items: [
             iconLibrary(actions),
             ...levelRows(1),
@@ -150,16 +249,6 @@ export function createSchema(store, actions) {
         {
           title: 'LIGHT & TONE',
           items: [
-            {
-              type: 'select',
-              key: 'imageTone',
-              label: 'IMAGE TONE',
-              visible: isImage,
-              options: [
-                ['tone', 'BRIGHTNESS'],
-                ['solid', 'SOLID SHAPE'],
-              ],
-            },
             {
               type: 'select',
               key: 'lighting',
@@ -339,10 +428,34 @@ export function createSchema(store, actions) {
         },
         {
           title: 'LIGHT',
+          visible: isModel,
           items: [{ type: 'check', key: 'lightOrbit', label: 'LIGHT ORBIT', visible: isModel }],
         },
         {
+          title: 'POINT FX',
+          visible: isPoints,
+          items: [
+            {
+              type: 'select',
+              key: 'ptFx',
+              label: 'GATHER',
+              options: [
+                ['none', 'OFF'],
+                ['pulse', 'PULSE'],
+                ['sweep', 'SWEEP'],
+              ],
+            },
+            { type: 'slider', key: 'ptBurst', label: 'BURST', min: 0, max: 1, step: 0.01, visible: (s) => s.ptFx !== 'none' },
+            { type: 'slider', key: 'ptDrift', label: 'DRIFT', min: 0, max: 1, step: 0.01 },
+            {
+              type: 'note',
+              text: 'The points scatter and gather again once per LOOP. SWAY in MOTION shows off the depth.',
+            },
+          ],
+        },
+        {
           title: 'TONE FX',
+          visible: isRaster,
           items: [
             { type: 'slider', key: 'wave', label: 'WAVE', min: 0, max: 1, step: 0.01 },
             { type: 'slider', key: 'waveFreq', label: 'WAVE FREQ', min: 0.25, max: 6, step: 0.25, digits: 2 },

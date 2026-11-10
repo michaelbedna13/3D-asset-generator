@@ -1,5 +1,5 @@
 import './style.css';
-import { createStore, ASPECTS, DEFAULTS } from './state.js';
+import { createStore, ASPECTS, DEFAULTS, PAIRINGS, inkFromLights } from './state.js';
 import { Stage } from './stage.js';
 import { gridDims, computeCells, drawCanvas, toSVG } from './halftone.js';
 import { buildPanel } from './panel.js';
@@ -54,15 +54,69 @@ const app = {
   get phase() {
     return phase;
   },
-  render(target, W, H, ph, options) {
+  get pointMode() {
+    return pointMode();
+  },
+  render(target, W, H, ph, options = {}) {
+    if (pointMode()) {
+      stage.setAspect(ASPECTS[state.aspect] || 1);
+      const count = stage.renderPoints(target, W, H, state, ph, options);
+      if (!options.transparent) finish(target, W, H, ph);
+      return { points: true, count };
+    }
     const cells = sampleCells(ph);
     drawCanvas(target, W, H, cells, state, options);
     return cells;
   },
   svg(W, H, ph, options) {
+    if (pointMode()) throw new Error('SVG is not available for point clouds – use PNG');
     return toSVG(W, H, sampleCells(ph), state, options);
   },
 };
+
+function pointMode() {
+  return state.object === 'image' && state.render === 'points';
+}
+
+// Vignette and film grain, laid over a finished point-cloud frame.
+let grainTile = null;
+function finish(target, W, H, ph) {
+  if (state.vignette > 0) {
+    const r = Math.hypot(W, H) / 2;
+    const gradient = target.createRadialGradient(W / 2, H / 2, r * 0.45, W / 2, H / 2, r);
+    gradient.addColorStop(0, 'rgba(0,0,0,0)');
+    gradient.addColorStop(1, `rgba(0,0,0,${state.vignette * 0.9})`);
+    target.fillStyle = gradient;
+    target.fillRect(0, 0, W, H);
+  }
+  if (state.grain > 0) {
+    if (!grainTile) {
+      grainTile = document.createElement('canvas');
+      grainTile.width = grainTile.height = 256;
+      const g = grainTile.getContext('2d');
+      const image = g.createImageData(256, 256);
+      for (let i = 0; i < image.data.length; i += 4) {
+        const v = Math.random() * 255;
+        image.data[i] = image.data[i + 1] = image.data[i + 2] = v;
+        image.data[i + 3] = 255;
+      }
+      g.putImageData(image, 0, 0);
+    }
+    // The grain is sized against the frame and shifts every 1/24 of the loop,
+    // so it shimmers yet still loops.
+    const scale = Math.max(1, Math.min(W, H) / 1024);
+    const step = Math.floor(ph * 24);
+    target.save();
+    target.globalAlpha = state.grain * 0.5;
+    target.globalCompositeOperation = 'overlay';
+    target.imageSmoothingEnabled = false;
+    target.scale(scale, scale);
+    target.translate(-((step * 97) % 256), -((step * 57) % 256));
+    target.fillStyle = target.createPattern(grainTile, 'repeat');
+    target.fillRect(0, 0, W / scale + 256, H / scale + 256);
+    target.restore();
+  }
+}
 
 function fitCanvas() {
   const aspect = ASPECTS[state.aspect] || 1;
@@ -114,9 +168,10 @@ function updateStats() {
   if (!lastCells) return;
   statsStale = false;
   const { W, H } = frameSize(state, state.quality);
-  $('stats').textContent =
-    `${lastCells.cols}×${lastCells.rows} GRID · ${lastCells.count.toLocaleString('en-US')} CELLS · ` +
-    `PNG ${W}×${H}${state.play ? ` · ${fps} FPS` : ''}`;
+  const what = lastCells.points
+    ? `${lastCells.count.toLocaleString('en-US')} POINTS`
+    : `${lastCells.cols}×${lastCells.rows} GRID · ${lastCells.count.toLocaleString('en-US')} CELLS`;
+  $('stats').textContent = `${what} · PNG ${W}×${H}${state.play ? ` · ${fps} FPS` : ''}`;
 }
 
 // ---------- models ----------
@@ -333,6 +388,25 @@ const actions = {
     }
   },
   loadPreset: () => filePreset.click(),
+  // Switching a picture to the point cloud also sets the stage for it: a dark
+  // ground so the points glow, and a gentle sway that shows the depth.
+  setRender(render) {
+    const patch = { render };
+    if (render === 'points') {
+      if (!inkFromLights(state)) {
+        const dark = PAIRINGS.length - 1;
+        Object.assign(patch, { pairing: dark, ink: PAIRINGS[dark].ink, bg: PAIRINGS[dark].bg });
+      }
+      if (state.motion === 'still') Object.assign(patch, { motion: 'sway', sway: 12 });
+    }
+    store.set(patch);
+  },
+  loadDepthMap: () => fileDepth.click(),
+  clearDepthMap() {
+    stage.setDepthMap(null);
+    dirty = true;
+    toast('DEPTH FROM BRIGHTNESS');
+  },
   addIcon() {
     if (state.icons.length >= MAX_ICONS) toast(`${MAX_ICONS} ICONS IS THE LIMIT – REMOVE ONE FIRST`, 4000, true);
     else fileIcon.click();
@@ -346,6 +420,20 @@ const actions = {
     toast('ICON REMOVED · ⌘Z TO UNDO');
   },
 };
+
+const fileDepth = $('file-depth');
+fileDepth.addEventListener('change', async () => {
+  const file = fileDepth.files[0];
+  fileDepth.value = '';
+  if (!file) return;
+  try {
+    stage.setDepthMap(await fileToCanvas(file, 1024));
+    dirty = true;
+    toast('DEPTH MAP LOADED');
+  } catch (error) {
+    toast(`COULD NOT LOAD DEPTH MAP – ${error.message}`.toUpperCase(), 6000, true);
+  }
+});
 
 const fileIcon = $('file-icon');
 fileIcon.addEventListener('change', async () => {

@@ -1,6 +1,6 @@
 // PNG / SVG / GIF / MP4 export. Animated formats render one seamless loop,
 // frame by frame at exact phases, so the result never depends on preview speed.
-import { GIFEncoder, applyPalette } from 'gifenc';
+import { GIFEncoder, applyPalette, quantize } from 'gifenc';
 import { Muxer, ArrayBufferTarget } from 'mp4-muxer';
 import { ASPECTS } from './state.js';
 
@@ -110,7 +110,27 @@ export async function exportGIF(app, { onProgress, signal } = {}) {
   const delay = Math.round(100 / fps) * 10; // GIF timing has 10 ms resolution
   const canvas = makeCanvas(W, H);
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
-  const palette = buildPalette(state);
+  // A point cloud carries the picture's own colours, so its palette is
+  // quantized from a few frames spread across the loop.
+  let palette;
+  if (app.pointMode) {
+    const picks = [0, 1 / 3, 2 / 3];
+    const sample = new Uint8ClampedArray(W * H * picks.length);
+    picks.forEach((p, k) => {
+      app.render(ctx, W, H, p);
+      const { data } = ctx.getImageData(0, 0, W, H);
+      // every fourth pixel is plenty for choosing colours
+      for (let i = 0, o = k * W * H; i + 3 < data.length && o + 3 < (k + 1) * W * H; i += 16, o += 4) {
+        sample[o] = data[i];
+        sample[o + 1] = data[i + 1];
+        sample[o + 2] = data[i + 2];
+        sample[o + 3] = 255;
+      }
+    });
+    palette = quantize(sample.subarray(0, Math.floor((W * H) / 4) * 4 * picks.length), 256);
+  } else {
+    palette = buildPalette(state);
+  }
   const gif = GIFEncoder();
 
   for (let i = 0; i < frames; i++) {

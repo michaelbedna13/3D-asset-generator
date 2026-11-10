@@ -9,6 +9,7 @@ export const PAIRINGS = [
   { name: 'PAPER / COBALT', ink: '#f2f2ee', bg: '#2440ff' },
   { name: 'INK / PAPER', ink: '#111214', bg: '#f2f2ee' },
   { name: 'PAPER / INK', ink: '#f2f2ee', bg: '#111214' },
+  { name: 'CHALK / BLACK', ink: '#f3f0ea', bg: '#040405' },
 ];
 
 export const SHAPE_DEFAULTS = {
@@ -54,6 +55,22 @@ export const DEFAULTS = {
   shadows: true,
   material: 'clay',
   imageTone: 'tone',
+
+  // picture style: 'raster' (shape grid) or 'points' (point cloud)
+  render: 'raster',
+  ptCount: 260000,
+  ptSize: 0.5,
+  ptDepth: 0.5,
+  ptDepthDir: 'bright',
+  ptCut: 0.06,
+  ptColor: 'image',
+  ptBlend: 'auto',
+  ptScatter: 0,
+  ptFx: 'none',
+  ptBurst: 0.5,
+  ptDrift: 0.2,
+  vignette: 0.3,
+  grain: 0.15,
 
   // scene
   object: 'knot',

@@ -3,6 +3,8 @@
 // canvas stays offscreen and only its pixels are read back.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { buildCloud, updateCloud } from './cloud.js';
+import { inkFromLights } from './state.js';
 
 const FRAME_FOV = 26; // vertical field of view of the export frame, degrees
 const TAU = Math.PI * 2;
@@ -90,6 +92,8 @@ export class Stage {
     this.tween = null;
     this.model = null;
     this.flat = false;
+    this.image = null;
+    this.cloud = null;
   }
 
   // Distance at which the unit bounding sphere just fills the frame.
@@ -172,10 +176,80 @@ export class Stage {
       new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide, blending: THREE.NoBlending }),
     );
     this.setModel(card, 'y', true);
+    this.image = { canvas, scale: k, depthMap: null };
+  }
+
+  // Replaces the brightness-derived depth of the point cloud with a real depth
+  // map (white = near). Pass null to go back to the automatic one.
+  setDepthMap(canvas) {
+    if (!this.image) return;
+    this.image.depthMap = canvas;
+    this.dropCloud();
+  }
+
+  dropCloud() {
+    if (!this.cloud) return;
+    this.cloud.removeFromParent();
+    this.cloud.geometry.dispose();
+    this.cloud.material.dispose();
+    this.cloud = null;
+  }
+
+  // Draws the picture as a point cloud straight into a 2D context.
+  renderPoints(ctx, W, H, s, phase, { transparent = false } = {}) {
+    if (!this.image) return 0;
+    if (!this.cloud || this.cloud.userData.target !== s.ptCount) {
+      this.dropCloud();
+      this.cloud = buildCloud(this.image.canvas, this.image.depthMap, s.ptCount, this.image.scale);
+      this.cloud.userData.target = s.ptCount;
+      this.orient.add(this.cloud);
+    }
+    this.applyLook(s, phase);
+
+    const cam = this.camera;
+    cam.fov = FRAME_FOV;
+    cam.aspect = W / H;
+    const dist = cam.position.length();
+    cam.near = Math.max(0.02, dist * 0.02);
+    cam.far = dist + 12;
+    cam.updateProjectionMatrix();
+
+    // Very large exports are rendered at the GPU-safe size and scaled up.
+    const fit = Math.min(1, 4096 / Math.max(W, H));
+    const w = Math.max(1, Math.round(W * fit));
+    const h = Math.max(1, Math.round(H * fit));
+    const r = this.renderer;
+    const size = r.getSize(new THREE.Vector2());
+    if (size.x !== w || size.y !== h) r.setSize(w, h, false);
+
+    const glow = s.ptBlend === 'glow' || (s.ptBlend === 'auto' && inkFromLights(s));
+    updateCloud(this.cloud, s, phase, {
+      pixelsPerUnit: h / (2 * Math.tan(rad(FRAME_FOV / 2))),
+      glow,
+      shadowTone: !inkFromLights(s),
+    });
+
+    this.model.visible = false;
+    this.cloud.visible = true;
+    r.setRenderTarget(null);
+    r.setClearColor(s.bg, transparent ? 0 : 1);
+    r.clear();
+    r.render(this.scene, cam);
+    r.setClearColor(0x000000, 0);
+    this.cloud.visible = false;
+    this.model.visible = true;
+
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(r.domElement, 0, 0, W, H);
+    return this.cloud.userData.count;
   }
 
   setModel(object, upAxis = 'y', flat = false) {
     this.flat = flat;
+    this.dropCloud();
+    this.image = null;
     if (this.model) {
       this.fit.clear();
       disposeObject(this.model);
