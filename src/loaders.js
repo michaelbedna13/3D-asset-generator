@@ -24,21 +24,22 @@ export async function loadModelFiles(fileList) {
   });
 
   try {
-    const url = urls.get(main.name);
+    // The main file is parsed from memory; only side files (.bin, textures)
+    // referenced by a .gltf / .obj go through the blob URL map.
     const ext = extension(main.name);
     let object;
     if (ext === 'glb' || ext === 'gltf') {
       const draco = new DRACOLoader(manager); // decoder is bundled with three
       const loader = new GLTFLoader(manager).setDRACOLoader(draco).setMeshoptDecoder(MeshoptDecoder);
       try {
-        object = (await loader.loadAsync(url)).scene;
+        object = (await loader.parseAsync(await main.arrayBuffer(), '')).scene;
       } finally {
         draco.dispose();
       }
     } else if (ext === 'obj') {
-      object = await new OBJLoader(manager).loadAsync(url);
+      object = new OBJLoader(manager).parse(await main.text());
     } else {
-      const geometry = await new STLLoader(manager).loadAsync(url);
+      const geometry = new STLLoader(manager).parse(await main.arrayBuffer());
       object = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85 }));
     }
     let meshes = 0;

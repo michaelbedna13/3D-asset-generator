@@ -19,7 +19,12 @@
   --danger: #ff6a55;
   --mono: 'JetBrains Mono Variable', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   --panel-w: 348px;
+  /* side gutters also clear a notch / system bar on phones */
+  --gutter-l: max(16px, env(safe-area-inset-left, 0px));
+  --gutter-r: max(16px, env(safe-area-inset-right, 0px));
   color-scheme: dark;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 * {
@@ -64,7 +69,7 @@ select {
 #app {
   display: grid;
   grid-template-columns: minmax(0, 1fr) var(--panel-w);
-  height: 100dvh;
+  height: 100%;
 }
 
 /* ---------- stage ---------- */
@@ -82,7 +87,7 @@ select {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 10px 16px;
+  padding: 10px 16px 10px var(--gutter-l);
   border-bottom: 1px solid var(--line);
 }
 
@@ -272,7 +277,7 @@ h1 span {
 .dock-row {
   display: flex;
   gap: 8px;
-  padding: 10px 16px;
+  padding: 10px 16px 10px var(--gutter-l);
   align-items: center;
 }
 
@@ -294,7 +299,7 @@ h1 span {
   display: flex;
   justify-content: space-between;
   gap: 16px;
-  padding: 7px 16px;
+  padding: 7px 16px 7px var(--gutter-l);
   border-top: 1px solid var(--line);
   color: var(--dim);
   font-size: 10px;
@@ -363,7 +368,7 @@ h1 span {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 12px 16px 8px;
+  padding: 12px var(--gutter-r) 8px 16px;
   cursor: pointer;
   user-select: none;
 }
@@ -395,7 +400,7 @@ h1 span {
 .section-body {
   display: grid;
   gap: 5px;
-  margin: 0 16px 14px 19px;
+  margin: 0 var(--gutter-r) 14px 19px;
   padding-left: 12px;
   border-left: 1px solid var(--line);
 }
@@ -602,9 +607,24 @@ input[type='color']::-moz-color-swatch {
 /* ---------- small screens: preview on top, controls scroll below ---------- */
 
 @media (max-width: 860px) {
+  html,
+  body {
+    height: auto;
+  }
+
   body {
     overflow: auto;
     font-size: 12px;
+  }
+
+  /* keeps scrolled controls from showing above the sticky preview */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0 0 auto;
+    height: env(safe-area-inset-top, 0px);
+    z-index: 10;
+    background: var(--bg);
   }
 
   #app {
@@ -614,7 +634,7 @@ input[type='color']::-moz-color-swatch {
 
   .stage {
     position: sticky;
-    top: 0;
+    top: env(safe-area-inset-top, 0px);
     z-index: 5;
     height: min(58dvh, 100vw + 96px);
     background: var(--bg);
@@ -622,7 +642,8 @@ input[type='color']::-moz-color-swatch {
   }
 
   .topbar {
-    padding: 8px 12px;
+    padding: 8px var(--gutter-r) 8px var(--gutter-l);
+    gap: 8px;
   }
 
   h1 span,
@@ -631,7 +652,7 @@ input[type='color']::-moz-color-swatch {
   }
 
   .dock-row {
-    padding: 8px 12px;
+    padding: 8px var(--gutter-r) 8px var(--gutter-l);
   }
 
   .status {
@@ -641,11 +662,18 @@ input[type='color']::-moz-color-swatch {
   .panel {
     border-left: 0;
     overflow: visible;
-    padding-bottom: env(safe-area-inset-bottom);
   }
 
   .tabs {
     position: static;
+  }
+
+  .section summary {
+    padding-left: var(--gutter-l);
+  }
+
+  .section-body {
+    margin-left: calc(var(--gutter-l) + 3px);
   }
 
   .row {

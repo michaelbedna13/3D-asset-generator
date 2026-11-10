@@ -256,7 +256,11 @@ async function runExport(kind) {
         $('progress-bar').style.width = `${pct}%`;
       },
     });
-    download(result.blob, `${fileBase()}.${result.ext}`);
+    $('progress').hidden = true;
+    if ((await download(result.blob, `${fileBase()}.${result.ext}`)) === 'declined') {
+      toast('EXPORT CANCELLED');
+      return;
+    }
     const mb = result.blob.size / 1048576;
     const size = mb >= 1 ? `${mb.toFixed(1)} MB` : `${Math.max(1, Math.round(result.blob.size / 1024))} KB`;
     toast(`SAVED ${result.ext.toUpperCase()} · ${result.info} · ${size}`.toUpperCase(), 4200);
@@ -293,9 +297,13 @@ filePreset.addEventListener('change', () => {
 
 const actions = {
   export: runExport,
-  savePreset() {
-    download(new Blob([store.exportPreset()], { type: 'application/json' }), 'rastr-preset.json');
-    toast('PRESET SAVED');
+  async savePreset() {
+    try {
+      const blob = new Blob([store.exportPreset()], { type: 'application/json' });
+      if ((await download(blob, 'rastr-preset.json')) === 'saved') toast('PRESET SAVED');
+    } catch (error) {
+      toast(`COULD NOT SAVE PRESET – ${error.message}`.toUpperCase(), 6000, true);
+    }
   },
   loadPreset: () => filePreset.click(),
 };

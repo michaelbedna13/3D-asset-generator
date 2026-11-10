@@ -20,7 +20,25 @@ export function frameSize(state, scale = 1, even = false) {
   return { W, H };
 }
 
-export function download(blob, filename) {
+// Inside a claude.ai artifact the page can't start a download on its own; the
+// host offers a `downloads` capability instead. Everywhere else `window.claude`
+// doesn't exist and a plain download link is used.
+const hosted = typeof window !== 'undefined' && typeof window.claude?.use === 'function';
+const hostDownloads = hosted ? window.claude.use('downloads').catch(() => null) : null;
+
+// Resolves 'saved', or 'declined' when the viewer dismisses the host's prompt.
+export async function download(blob, filename) {
+  if (hosted) {
+    const downloads = await hostDownloads;
+    if (!downloads) throw new Error('Saving files is not available in this view');
+    try {
+      await downloads.save({ filename, data: blob });
+      return 'saved';
+    } catch (error) {
+      if (error?.code === 'declined') return 'declined';
+      throw new Error(error?.message || 'The file could not be saved');
+    }
+  }
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -29,6 +47,7 @@ export function download(blob, filename) {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 30_000);
+  return 'saved';
 }
 
 function makeCanvas(W, H) {
