@@ -3,3 +3,6 @@ dist
 dist-single
 .DS_Store
 *.log
+
+# design-review captures
+.impeccable/review/

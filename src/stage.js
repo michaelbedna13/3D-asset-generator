@@ -252,7 +252,8 @@ export class Stage {
     this.image = null;
     if (this.model) {
       this.fit.clear();
-      disposeObject(this.model);
+      // a loaded model flagged `keep` stays alive so it can be shown again
+      if (!this.model.userData.keep) disposeObject(this.model);
     }
     this.model = object;
     this.orient = new THREE.Group();

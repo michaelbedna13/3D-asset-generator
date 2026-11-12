@@ -1,18 +1,20 @@
-// Schema-driven control panel. Every control is bound to one key of the store
-// and re-syncs itself whenever the store changes (undo, presets, pairings…).
-import { normalizeHex } from './state.js';
+// Schema-driven controls. Every control is bound to one key of the store and
+// re-syncs itself whenever the store changes (undo, presets, look switches…).
+import { normalizeHex, DEFAULTS } from './state.js';
 
 let uid = 0;
 
-function el(tag, props = {}, children = []) {
+export function el(tag, props = {}, children = []) {
   const node = document.createElement(tag);
   for (const [k, v] of Object.entries(props)) {
+    if (v == null || v === false) continue;
     if (k === 'class') node.className = v;
     else if (k === 'text') node.textContent = v;
+    else if (k === 'html') node.innerHTML = v;
     else if (k.startsWith('on')) node.addEventListener(k.slice(2), v);
     else node.setAttribute(k, v);
   }
-  for (const child of children) node.append(child);
+  for (const child of children) if (child) node.append(child);
   return node;
 }
 
@@ -20,11 +22,27 @@ function trimNumber(value, digits) {
   return digits ? value.toFixed(digits) : String(Math.round(value));
 }
 
+function digitsFor(item) {
+  return item.digits ?? (item.step < 1 ? (item.step < 0.1 ? 2 : 1) : 0);
+}
+
+// label + control(s) on one line
+function row(label, id, controls, extra = '') {
+  const name = id ? el('label', { for: id, text: label }) : el('span', { class: 'label', text: label });
+  return { node: el('div', { class: `row ${extra}` }, [name, el('div', { class: 'ctl' }, controls)]), name };
+}
+
+function rangeInput(item, store, id) {
+  const input = el('input', { type: 'range', id, min: item.min, max: item.max, step: item.step });
+  const paint = (v) => input.style.setProperty('--fill', `${((v - item.min) / (item.max - item.min)) * 100}%`);
+  return { input, paint };
+}
+
 const builders = {
   slider(item, store) {
     const id = `c${++uid}`;
-    const digits = item.digits ?? (item.step < 1 ? (item.step < 0.1 ? 2 : 1) : 0);
-    const range = el('input', { type: 'range', id, min: item.min, max: item.max, step: item.step });
+    const digits = digitsFor(item);
+    const { input: range, paint } = rangeInput(item, store, id);
     const num = el('input', {
       type: 'number',
       class: 'num',
@@ -33,8 +51,11 @@ const builders = {
       step: item.step,
       'aria-label': `${item.label} value`,
     });
-    const paint = (v) => {
-      range.style.setProperty('--fill', `${((v - item.min) / (item.max - item.min)) * 100}%`);
+    const sync = () => {
+      const v = store.state[item.key];
+      range.value = v;
+      if (document.activeElement !== num) num.value = trimNumber(v, digits);
+      paint(v);
     };
     range.addEventListener('input', () => {
       const v = Number(range.value);
@@ -45,22 +66,24 @@ const builders = {
     num.addEventListener('change', () => {
       let v = Number(num.value);
       if (!Number.isFinite(v)) v = store.state[item.key];
-      v = Math.min(item.max, Math.max(item.min, v));
-      store.set({ [item.key]: v });
+      store.set({ [item.key]: Math.min(item.max, Math.max(item.min, v)) });
       sync();
     });
-    const sync = () => {
-      const v = store.state[item.key];
-      range.value = v;
-      if (document.activeElement !== num) num.value = trimNumber(v, digits);
-      paint(v);
-    };
-    return { node: row(item.label, id, [range, num], 'row-slider'), sync };
+    const built = row(item.label, id, [range, num], 'row-slider');
+    // Double-clicking a slider's name puts it back to its default.
+    if (item.key in DEFAULTS) {
+      built.name.title = 'Double-click to reset';
+      built.name.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        store.set({ [item.key]: DEFAULTS[item.key] });
+      });
+    }
+    return { node: built.node, sync };
   },
 
   select(item, store) {
     const id = `c${++uid}`;
-    const select = el('select', { id });
+    const select = el('select', { id, 'aria-label': item.bare ? item.label : null });
     const sync = () => {
       const options = typeof item.options === 'function' ? item.options(store.state) : item.options;
       const signature = options.map(([value, label]) => `${value}=${label}`).join('|');
@@ -76,7 +99,59 @@ const builders = {
       if (item.onSelect) item.onSelect(value);
       else store.set({ [item.key]: value });
     });
-    return { node: row(item.label, id, [el('div', { class: 'select' }, [select])]), sync };
+    const wrap = el('div', { class: 'select' }, [select]);
+    return { node: item.bare ? wrap : row(item.label, id, [wrap]).node, sync };
+  },
+
+  // A few mutually exclusive choices, all visible: a radio group drawn as one strip.
+  segment(item, store) {
+    const id = `c${++uid}`;
+    const current = () => (item.value ? item.value(store.state) : store.state[item.key]);
+    const choose = (value) => {
+      if (item.onSelect) item.onSelect(value);
+      else store.set({ [item.key]: value });
+    };
+    const buttons = item.options.map(([value, label, glyph]) => {
+      const button = el('button', {
+        type: 'button',
+        role: 'radio',
+        class: 'seg-btn',
+        title: item.titles?.[value],
+        'aria-label': glyph && item.iconOnly ? label : null,
+        onclick: () => choose(value),
+      });
+      if (glyph) button.append(el('span', { class: 'glyph', html: glyph }));
+      if (!(glyph && item.iconOnly)) button.append(el('span', { text: label }));
+      button._value = value;
+      return button;
+    });
+    const group = el('div', { class: `seg ${item.class || ''}`, role: 'radiogroup', 'aria-labelledby': `${id}-l` }, buttons);
+    group.addEventListener('keydown', (e) => {
+      const step = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
+      if (!step) return;
+      e.preventDefault();
+      const index = buttons.findIndex((b) => b._value === current());
+      const next = buttons[(index + step + buttons.length) % buttons.length];
+      choose(next._value);
+      next.focus();
+    });
+    const sync = () => {
+      const value = current();
+      for (const button of buttons) {
+        const on = button._value === value;
+        button.setAttribute('aria-checked', String(on));
+        button.tabIndex = on ? 0 : -1;
+      }
+      if (!buttons.some((b) => b.tabIndex === 0)) buttons[0].tabIndex = 0;
+    };
+    if (item.bare) {
+      group.removeAttribute('aria-labelledby');
+      group.setAttribute('aria-label', item.label);
+      return { node: group, sync };
+    }
+    const built = row(item.label, null, [group]);
+    built.name.id = `${id}-l`;
+    return { node: built.node, sync };
   },
 
   check(item, store) {
@@ -86,7 +161,7 @@ const builders = {
     const sync = () => {
       input.checked = !!store.state[item.key];
     };
-    return { node: row(item.label, id, [input]), sync };
+    return { node: row(item.label, id, [input]).node, sync };
   },
 
   color(item, store) {
@@ -105,60 +180,68 @@ const builders = {
       if (item.onSet) Object.assign(patch, item.onSet(value));
       store.set(patch);
     };
+    const sync = () => {
+      swatch.value = store.state[item.key];
+      if (document.activeElement !== hex) hex.value = store.state[item.key];
+    };
     swatch.addEventListener('input', () => commit(swatch.value));
     hex.addEventListener('change', () => {
       const value = normalizeHex(hex.value);
       if (value) commit(value);
       sync();
     });
-    const sync = () => {
-      swatch.value = store.state[item.key];
-      if (document.activeElement !== hex) hex.value = store.state[item.key];
-    };
-    return { node: row(item.label, id, [swatch, hex], 'row-color'), sync };
+    return { node: row(item.label, id, [swatch, hex], 'row-color').node, sync };
   },
 
   buttons(item) {
     const node = el(
       'div',
       { class: `buttons cols-${item.columns || 1}` },
-      item.buttons.map((b) =>
-        el('button', {
+      item.buttons.map((b) => {
+        const button = el('button', {
           type: 'button',
           class: b.primary ? 'btn primary' : 'btn',
-          text: b.label,
-          title: b.title || '',
+          title: b.title,
           onclick: b.onClick,
-        }),
-      ),
+        });
+        if (b.glyph) button.append(el('span', { class: 'glyph', html: b.glyph }));
+        button.append(el('span', { text: b.label }));
+        if (b.hint) button.append(el('kbd', { text: b.hint }));
+        return button;
+      }),
     );
     return { node, sync() {} };
-  },
-
-  // Escape hatch for one-off controls: the schema supplies its own builder.
-  custom(item, store) {
-    return item.build(store, el);
   },
 
   note(item) {
     return { node: el('p', { class: 'note', text: item.text }), sync() {} };
   },
+
+  // Escape hatch for one-off controls: the schema supplies its own builder.
+  custom(item, store) {
+    return item.build(store);
+  },
 };
 
-function row(label, id, controls, extra = '') {
-  return el('div', { class: `row ${extra}` }, [
-    el('label', { for: id, text: label }),
-    el('div', { class: 'ctl' }, controls),
-  ]);
+// Builds one control outside the panel (canvas bar, top bar) and keeps it in sync.
+export function bindControl(item, store) {
+  const control = builders[item.type](item, store);
+  const refresh = () => {
+    control.sync();
+    if (item.visible) control.node.hidden = !item.visible(store.state);
+  };
+  refresh();
+  store.subscribe(refresh);
+  return control.node;
 }
 
 export function buildPanel(root, tabs, store) {
   const bound = [];
-  const sections = [];
+  const groups = [];
   const tabButtons = [];
   const pages = [];
 
-  const tablist = el('div', { class: 'tabs', role: 'tablist' });
+  const tablist = el('div', { class: 'tabs', role: 'tablist', 'aria-label': 'Settings' });
   root.append(tablist);
 
   const setTab = (id) => {
@@ -189,16 +272,16 @@ export function buildPanel(root, tabs, store) {
     tablist.append(button);
 
     const page = el('div', { class: 'page', role: 'tabpanel', id: `page-${tab.id}`, 'aria-labelledby': `tab-${tab.id}` });
-    for (const section of tab.sections) {
-      const body = el('div', { class: 'section-body' });
-      for (const item of section.items) {
+    for (const group of tab.groups) {
+      const body = el('div', { class: 'group-body' });
+      for (const item of group.items) {
         const control = builders[item.type](item, store);
         bound.push({ ...control, item });
         body.append(control.node);
       }
-      const details = el('details', { class: 'section' }, [el('summary', { text: section.title }), body]);
-      details.open = section.open !== false;
-      if (section.visible) sections.push({ node: details, visible: section.visible });
+      const details = el('details', { class: 'group' }, [el('summary', { text: group.title }), body]);
+      details.open = group.open !== false;
+      if (group.visible) groups.push({ node: details, visible: group.visible });
       page.append(details);
     }
     pages.push(page);
@@ -210,7 +293,7 @@ export function buildPanel(root, tabs, store) {
       sync();
       if (item.visible) node.hidden = !item.visible(store.state);
     }
-    for (const { node, visible } of sections) node.hidden = !visible(store.state);
+    for (const { node, visible } of groups) node.hidden = !visible(store.state);
   };
   refresh();
   setTab(tabs[0].id);
