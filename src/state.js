@@ -37,9 +37,9 @@ export const SHAPE_DEFAULTS = {
 
 export const DEFAULTS = {
   // colours
-  pairing: 0,
-  ink: PAIRINGS[0].ink,
-  bg: PAIRINGS[0].bg,
+  pairing: 8,
+  ink: PAIRINGS[8].ink,
+  bg: PAIRINGS[8].bg,
   accentLevel: 0,
   accent: '#ff4d2e',
   inkFrom: 'auto',
@@ -57,7 +57,7 @@ export const DEFAULTS = {
   imageTone: 'tone',
 
   // picture style: 'raster' (shape grid) or 'points' (point cloud)
-  render: 'raster',
+  render: 'points',
   ptCount: 260000,
   ptSize: 0.5,
   ptDepth: 0.5,
@@ -73,7 +73,9 @@ export const DEFAULTS = {
   grain: 0.15,
 
   // scene
-  object: 'knot',
+  // what is on stage: `pic:<sample>`, a built-in object id, or `image` /
+  // `custom` for a loaded picture / model
+  object: 'pic:skyline',
   upAxis: 'y',
   zoom: 1,
   play: true,
@@ -81,14 +83,17 @@ export const DEFAULTS = {
   dir: 'left',
 
   // animate
-  motion: 'turntable',
-  sway: 30,
+  motion: 'sway',
+  sway: 12,
   float: 0,
   lightOrbit: false,
   wave: 0,
   waveFreq: 1.5,
   waveAngle: 0,
   shimmer: 0,
+
+  // tone of the area around the canvas: 'dark' | 'grey' | 'light'
+  surround: 'dark',
 
   // export
   aspect: '1:1',
@@ -107,11 +112,11 @@ export const ASPECTS = {
   '16:9': 16 / 9,
 };
 
-const STORAGE_KEY = 'rastr-studio:v1';
+const STORAGE_KEY = 'rastr-studio:v2';
 // Keys that describe the session rather than the look – not worth an undo step.
 const NO_HISTORY = new Set(['zoom', 'play']);
 // What is on stage is not part of the look: undo never swaps the loaded model or picture.
-const SESSION = new Set(['object', 'upAxis', 'zoom', 'play']);
+const SESSION = new Set(['object', 'upAxis', 'zoom', 'play', 'surround']);
 
 export function createStore() {
   const state = { ...DEFAULTS };
@@ -195,6 +200,8 @@ export function createStore() {
       listeners.add(fn);
       return () => listeners.delete(fn);
     },
+    canUndo: () => undoStack.length > 0 || pendingSnapshot !== null,
+    canRedo: () => redoStack.length > 0 && pendingSnapshot === null,
     undo() {
       commitHistory();
       if (!undoStack.length) return false;
@@ -261,6 +268,9 @@ export function inkFromLights(state) {
   if (state.inkFrom === 'shadows') return false;
   return luminance(state.ink) > luminance(state.bg);
 }
+
+export const isPicture = (state) => state.object === 'image' || state.object.startsWith('pic:');
+export const isPointCloud = (state) => isPicture(state) && state.render === 'points';
 
 export function normalizeHex(value) {
   let v = String(value).trim().replace(/^#/, '');

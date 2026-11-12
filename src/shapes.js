@@ -63,17 +63,17 @@ export const SHAPES = {
 };
 
 export const SHAPE_OPTIONS = [
-  ['dot', 'DOT'],
-  ['ring', 'RING'],
-  ['cross', 'CROSS'],
-  ['plus', 'PLUS'],
-  ['square', 'SQUARE'],
-  ['rounded', 'ROUNDED'],
-  ['diamond', 'DIAMOND'],
-  ['triangle', 'TRIANGLE'],
-  ['bar', 'BAR'],
-  ['slash', 'SLASH'],
-  ['none', 'NONE'],
+  ['dot', 'Dot'],
+  ['ring', 'Ring'],
+  ['cross', 'Cross'],
+  ['plus', 'Plus'],
+  ['square', 'Square'],
+  ['rounded', 'Rounded'],
+  ['diamond', 'Diamond'],
+  ['triangle', 'Triangle'],
+  ['bar', 'Bar'],
+  ['slash', 'Slash'],
+  ['none', 'None'],
 ];
 
 export function canvasSink(ctx) {

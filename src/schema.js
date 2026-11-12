@@ -1,484 +1,561 @@
-// Declarative description of the control panel (see panel.js for the builders).
-import { PAIRINGS, SHAPE_DEFAULTS } from './state.js';
+// What the control panel contains: three tabs, and in each only the groups that
+// act on what is on the canvas right now (see panel.js for the control builders).
+import { PAIRINGS, SHAPE_DEFAULTS, isPicture, isPointCloud } from './state.js';
 import { SHAPE_OPTIONS } from './shapes.js';
+import { el } from './panel.js';
+import { GLYPHS } from './glyphs.js';
 
-const shapeOptions = (s) => [
-  ...SHAPE_OPTIONS,
-  ...s.icons.map((icon) => [`icon:${icon.id}`, `ICON · ${icon.name.toUpperCase()}`]),
-];
+const cloud = isPointCloud;
+const raster = (s) => !isPointCloud(s);
+const picture = isPicture;
+const model = (s) => !isPicture(s);
 
-const levelRows = (n) => [
-  { type: 'select', key: `shape${n}`, label: `L${n} SHAPE`, options: shapeOptions },
-  { type: 'slider', key: `size${n}`, label: `L${n} SIZE`, min: 0.1, max: 1.2, step: 0.01 },
-];
+const shapeOptions = (s) => [...SHAPE_OPTIONS, ...s.icons.map((icon) => [`icon:${icon.id}`, `Icon: ${icon.name}`])];
 
-const isImage = (s) => s.object === 'image';
-const isModel = (s) => s.object !== 'image';
-const isPoints = (s) => s.object === 'image' && s.render === 'points';
-const isRaster = (s) => !isPoints(s);
-const isImageRaster = (s) => isImage(s) && isRaster(s);
-
-// The library of uploaded cell icons: a thumbnail per icon (click to remove)
-// and a button that opens the file picker.
-function iconLibrary(actions) {
-  return {
-    type: 'custom',
-    build(store, el) {
-      const list = el('div', { class: 'icon-list' });
-      const node = el('div', { class: 'icons' }, [el('span', { class: 'icons-title', text: 'YOUR ICONS' }), list]);
-      let signature = null;
-      const sync = () => {
-        const { icons } = store.state;
-        const next = icons.map((icon) => icon.id).join(',');
-        if (next === signature) return;
-        signature = next;
-        list.replaceChildren(
-          ...icons.map((icon) => {
-            const img = el('img', { src: icon.data, alt: '' });
-            return el(
-              'button',
-              {
-                type: 'button',
-                class: 'icon-chip',
-                title: `Remove ${icon.name}`,
-                'aria-label': `Remove icon ${icon.name}`,
-                onclick: () => actions.removeIcon(icon.id),
-              },
-              [img, el('span', { class: 'icon-x', text: '×', 'aria-hidden': 'true' })],
-            );
-          }),
-          el('button', { type: 'button', class: 'btn', text: '+ ADD ICON', onclick: actions.addIcon }),
-        );
-      };
-      return { node, sync };
-    },
-  };
+// Colour pairings as swatches: the ground with a dot of ink on it.
+function pairingSwatches(store) {
+  const buttons = PAIRINGS.map((p, i) => {
+    const name = p.name.toLowerCase().replace(' / ', ' on ');
+    return el(
+      'button',
+      {
+        type: 'button',
+        class: 'swatch',
+        title: name,
+        'aria-label': `Pairing: ${name}`,
+        style: `--ground:${p.bg};--ink:${p.ink}`,
+        onclick: () => store.set({ pairing: i, ink: p.ink, bg: p.bg }),
+      },
+      [el('i')],
+    );
+  });
+  const node = el('div', { class: 'swatches', role: 'group', 'aria-label': 'Colour pairings' }, buttons);
+  const sync = () => buttons.forEach((b, i) => b.setAttribute('aria-pressed', String(store.state.pairing === i)));
+  return { node, sync };
 }
 
+// The four tone levels as one table: where each starts, its shape, its size.
+function levelsTable(store) {
+  const syncs = [];
+  const rows = [1, 2, 3, 4].map((n) => {
+    const startKey = `l${n}`;
+    const sizeKey = `size${n}`;
+    const shapeKey = `shape${n}`;
+
+    const range = el('input', { type: 'range', min: 0, max: 1, step: 0.01, 'aria-label': `Level ${n} starts at` });
+    const start = el('output', { class: 'level-start' });
+    range.addEventListener('input', () => store.set({ [startKey]: Number(range.value) }));
+
+    const select = el('select', { 'aria-label': `Level ${n} shape` });
+    select.addEventListener('change', () => store.set({ [shapeKey]: select.value }));
+
+    const size = el('input', { type: 'number', class: 'num', min: 0.1, max: 1.2, step: 0.05, 'aria-label': `Level ${n} size` });
+    size.addEventListener('change', () => {
+      const v = Number(size.value);
+      if (Number.isFinite(v)) store.set({ [sizeKey]: Math.min(1.2, Math.max(0.1, v)) });
+    });
+
+    syncs.push(() => {
+      const s = store.state;
+      range.value = s[startKey];
+      range.style.setProperty('--fill', `${s[startKey] * 100}%`);
+      start.textContent = s[startKey].toFixed(2);
+      const options = shapeOptions(s);
+      const signature = options.map((o) => o.join('=')).join('|');
+      if (select._signature !== signature) {
+        select._signature = signature;
+        select.replaceChildren(...options.map(([value, label]) => el('option', { value, text: label })));
+      }
+      select.value = s[shapeKey];
+      if (document.activeElement !== size) size.value = s[sizeKey].toFixed(2);
+    });
+
+    return el('div', { class: 'level', role: 'row' }, [
+      el('span', { class: 'level-n', role: 'rowheader', text: String(n) }),
+      el('span', { class: 'level-range', role: 'cell' }, [range, start]),
+      el('span', { class: 'select', role: 'cell' }, [select]),
+      el('span', { role: 'cell' }, [size]),
+    ]);
+  });
+
+  const head = el('div', { class: 'level level-head', role: 'row' }, [
+    el('span', { role: 'columnheader', text: '' }),
+    el('span', { role: 'columnheader', text: 'Starts at' }),
+    el('span', { role: 'columnheader', text: 'Shape' }),
+    el('span', { class: 'level-size', role: 'columnheader', text: 'Size' }),
+  ]);
+  const node = el('div', { class: 'levels', role: 'table', 'aria-label': 'Tone levels' }, [head, ...rows]);
+  return { node, sync: () => syncs.forEach((fn) => fn()) };
+}
+
+// Uploaded cell icons: a thumbnail per icon (click to remove) and an add button.
+function iconLibrary(store, actions) {
+  const list = el('div', { class: 'icon-list' });
+  const node = el('div', { class: 'row' }, [el('span', { class: 'label', text: 'Your icons' }), el('div', { class: 'ctl' }, [list])]);
+  let signature = null;
+  const sync = () => {
+    const { icons } = store.state;
+    const next = icons.map((icon) => icon.id).join(',');
+    if (next === signature) return;
+    signature = next;
+    list.replaceChildren(
+      ...icons.map((icon) =>
+        el(
+          'button',
+          {
+            type: 'button',
+            class: 'icon-chip',
+            title: `Remove ${icon.name}`,
+            'aria-label': `Remove icon ${icon.name}`,
+            onclick: () => actions.removeIcon(icon.id),
+          },
+          [el('img', { src: icon.data, alt: '' }), el('span', { class: 'icon-x', html: GLYPHS.close })],
+        ),
+      ),
+      el('button', { type: 'button', class: 'btn icon-add', onclick: actions.addIcon }, [
+        el('span', { class: 'glyph', html: GLYPHS.plus }),
+        el('span', { text: 'Add' }),
+      ]),
+    );
+  };
+  return { node, sync };
+}
+
+function shortcutList() {
+  const rows = [
+    ['E', 'Export PNG'],
+    ['S', 'Export SVG'],
+    ['G', 'Export GIF'],
+    ['M', 'Export MP4'],
+    ['Space', 'Play or pause'],
+    ['1 – 5', 'Camera views'],
+    ['R', 'Reset the look'],
+    ['Ctrl / ⌘ Z', 'Undo'],
+    ['Shift Ctrl / ⌘ Z', 'Redo'],
+  ];
+  const node = el(
+    'dl',
+    { class: 'keys' },
+    rows.flatMap(([key, what]) => [el('dt', {}, [el('kbd', { text: key })]), el('dd', { text: what })]),
+  );
+  return { node, sync() {} };
+}
+
+const exposure = (visible) => ({ type: 'slider', key: 'exposure', label: 'Exposure', min: 0.2, max: 3, step: 0.01, visible });
+
 export function createSchema(store, actions) {
+  const depthButtons = [
+    ...(actions.estimateDepth
+      ? [
+          {
+            label: 'Estimate depth',
+            primary: true,
+            onClick: actions.estimateDepth,
+            title: 'Work out real depth with a depth model that runs in this browser',
+          },
+        ]
+      : []),
+    { label: 'Load map…', onClick: actions.loadDepthMap, title: 'Use a greyscale depth image of the same picture (white is near)' },
+    { label: 'Save map', onClick: actions.saveDepthMap, title: 'Download the depth map in use as a PNG' },
+    { label: 'Reset', onClick: actions.clearDepthMap, title: 'Go back to depth guessed from brightness' },
+  ];
+
   return [
     {
-      id: 'tool',
-      label: 'TOOL',
-      sections: [
+      id: 'look',
+      label: 'Look',
+      groups: [
         {
-          title: 'COLOURS',
+          title: 'Colour',
           items: [
+            { type: 'custom', build: pairingSwatches },
+            { type: 'color', key: 'ink', label: 'Ink', onSet: () => ({ pairing: -1 }) },
+            { type: 'color', key: 'bg', label: 'Ground', onSet: () => ({ pairing: -1 }) },
             {
-              type: 'select',
-              key: 'pairing',
-              label: 'PAIRING',
-              options: (s) => [
-                ...PAIRINGS.map((p, i) => [i, p.name]),
-                ...(s.pairing === -1 ? [[-1, 'CUSTOM']] : []),
-              ],
-              onSelect: (i) => {
-                if (PAIRINGS[i]) store.set({ pairing: i, ink: PAIRINGS[i].ink, bg: PAIRINGS[i].bg });
-              },
-            },
-            { type: 'color', key: 'ink', label: 'HIGHLIGHT', onSet: () => ({ pairing: -1 }) },
-            { type: 'color', key: 'bg', label: 'BACKGROUND', onSet: () => ({ pairing: -1 }) },
-          ],
-        },
-        {
-          title: 'IMAGE',
-          visible: isImage,
-          items: [
-            {
-              type: 'select',
-              key: 'render',
-              label: 'STYLE',
-              options: [
-                ['raster', 'SHAPE RASTER'],
-                ['points', 'POINT CLOUD'],
-              ],
-              onSelect: actions.setRender,
-            },
-            {
-              type: 'select',
-              key: 'imageTone',
-              label: 'IMAGE TONE',
-              visible: isImageRaster,
-              options: [
-                ['tone', 'BRIGHTNESS'],
-                ['solid', 'SOLID SHAPE'],
-              ],
-            },
-            {
-              type: 'select',
-              key: 'ptCount',
-              label: 'POINTS',
-              visible: isPoints,
-              options: [
-                [65000, '65 K'],
-                [130000, '130 K'],
-                [260000, '260 K'],
-                [520000, '520 K'],
-              ],
-            },
-            { type: 'slider', key: 'ptSize', label: 'POINT SIZE', min: 0.1, max: 2.5, step: 0.01, visible: isPoints },
-            { type: 'slider', key: 'ptDepth', label: 'DEPTH', min: 0, max: 2, step: 0.01, visible: isPoints },
-            {
-              type: 'select',
-              key: 'ptDepthDir',
-              label: 'NEAR IS',
-              visible: isPoints,
-              options: [
-                ['bright', 'BRIGHT'],
-                ['dark', 'DARK'],
-              ],
-            },
-            { type: 'slider', key: 'ptCut', label: 'CUTOFF', min: 0, max: 0.9, step: 0.01, visible: isPoints },
-            { type: 'slider', key: 'ptScatter', label: 'SCATTER', min: 0, max: 1, step: 0.01, visible: isPoints },
-            {
-              type: 'select',
+              type: 'segment',
               key: 'ptColor',
-              label: 'COLOUR',
-              visible: isPoints,
+              label: 'Point colour',
+              visible: cloud,
               options: [
-                ['image', 'FROM IMAGE'],
-                ['ink', 'HIGHLIGHT'],
+                ['image', 'Picture'],
+                ['ink', 'Ink'],
               ],
             },
             {
-              type: 'select',
+              type: 'segment',
               key: 'ptBlend',
-              label: 'BLEND',
-              visible: isPoints,
+              label: 'Blend',
+              visible: cloud,
               options: [
-                ['auto', 'AUTO'],
-                ['glow', 'GLOW'],
-                ['solid', 'SOLID'],
-              ],
-            },
-            { type: 'slider', key: 'vignette', label: 'VIGNETTE', min: 0, max: 1, step: 0.01, visible: isPoints },
-            { type: 'slider', key: 'grain', label: 'GRAIN', min: 0, max: 1, step: 0.01, visible: isPoints },
-            {
-              type: 'buttons',
-              columns: 2,
-              visible: isPoints,
-              buttons: [
-                ...(actions.estimateDepth
-                  ? [
-                      {
-                        label: 'ESTIMATE DEPTH',
-                        primary: true,
-                        onClick: actions.estimateDepth,
-                        title: 'Work out real depth with a depth model running in this browser',
-                      },
-                    ]
-                  : []),
-                {
-                  label: 'LOAD DEPTH MAP',
-                  onClick: actions.loadDepthMap,
-                  title: 'Use a greyscale depth image (white = near) instead of the automatic depth',
-                },
-                { label: 'SAVE DEPTH MAP', onClick: actions.saveDepthMap, title: 'Download the depth map in use as a PNG' },
-                { label: 'AUTO DEPTH', onClick: actions.clearDepthMap, title: 'Go back to depth guessed from brightness' },
-              ],
-            },
-            {
-              type: 'note',
-              visible: isPoints,
-              text: actions.estimateDepth
-                ? 'Depth starts as a guess from brightness. ESTIMATE DEPTH runs a depth model in your browser: a 27 MB download the first time, and the picture never leaves your device.'
-                : 'Depth is guessed from brightness. For true depth, load a depth map of the same picture (white = near).',
-            },
-          ],
-        },
-        {
-          title: 'ADVANCED',
-          open: false,
-          visible: isRaster,
-          items: [
-            {
-              type: 'select',
-              key: 'inkFrom',
-              label: 'INK FROM',
-              options: [
-                ['auto', 'AUTO'],
-                ['shadows', 'SHADOWS'],
-                ['lights', 'LIGHTS'],
+                ['auto', 'Auto'],
+                ['glow', 'Glow'],
+                ['solid', 'Solid'],
               ],
             },
             {
               type: 'select',
               key: 'accentLevel',
-              label: 'ACCENT ON',
+              label: 'Accent on',
+              visible: raster,
               options: [
-                [0, 'OFF'],
-                [1, 'LEVEL 1'],
-                [2, 'LEVEL 2'],
-                [3, 'LEVEL 3'],
-                [4, 'LEVEL 4'],
+                [0, 'None'],
+                [1, 'Level 1'],
+                [2, 'Level 2'],
+                [3, 'Level 3'],
+                [4, 'Level 4'],
               ],
             },
-            { type: 'color', key: 'accent', label: 'ACCENT', visible: (s) => s.accentLevel > 0 },
-            { type: 'slider', key: 'contrast', label: 'CONTRAST', min: 0, max: 1, step: 0.01 },
-            { type: 'slider', key: 'dither', label: 'DITHER', min: 0, max: 1, step: 0.01 },
-            { type: 'slider', key: 'edge', label: 'EDGE FADE', min: 0, max: 1, step: 0.01 },
+            { type: 'color', key: 'accent', label: 'Accent', visible: (s) => raster(s) && s.accentLevel > 0 },
           ],
         },
         {
-          title: 'SHAPES',
-          visible: isRaster,
+          title: 'Points',
+          visible: cloud,
           items: [
+            {
+              type: 'segment',
+              key: 'ptCount',
+              label: 'Count',
+              options: [
+                [65000, '65k'],
+                [130000, '130k'],
+                [260000, '260k'],
+                [520000, '520k'],
+              ],
+            },
+            { type: 'slider', key: 'ptSize', label: 'Size', min: 0.1, max: 2.5, step: 0.01 },
+            { type: 'slider', key: 'ptCut', label: 'Cutoff', min: 0, max: 0.9, step: 0.01 },
+            { type: 'slider', key: 'ptScatter', label: 'Scatter', min: 0, max: 1, step: 0.01 },
+          ],
+        },
+        {
+          title: 'Depth',
+          visible: cloud,
+          items: [
+            { type: 'slider', key: 'ptDepth', label: 'Amount', min: 0, max: 2, step: 0.01 },
+            {
+              type: 'segment',
+              key: 'ptDepthDir',
+              label: 'Near is',
+              options: [
+                ['bright', 'Bright'],
+                ['dark', 'Dark'],
+              ],
+            },
+            { type: 'buttons', columns: 2, buttons: depthButtons },
+            {
+              type: 'note',
+              text: actions.estimateDepth
+                ? 'Depth starts as a guess from brightness. Estimate depth runs a depth model in this browser: a 27 MB download the first time, and the picture stays on your device.'
+                : 'Depth is guessed from brightness. For true depth, load a depth map of the same picture (white is near).',
+            },
+          ],
+        },
+        {
+          title: 'Finish',
+          visible: cloud,
+          items: [
+            exposure(),
+            { type: 'slider', key: 'vignette', label: 'Vignette', min: 0, max: 1, step: 0.01 },
+            { type: 'slider', key: 'grain', label: 'Grain', min: 0, max: 1, step: 0.01 },
+          ],
+        },
+        {
+          title: 'Grid',
+          visible: raster,
+          items: [
+            { type: 'slider', key: 'cell', label: 'Cell size', min: 4, max: 64, step: 1 },
+            { type: 'slider', key: 'margin', label: 'Gap', min: 0, max: 0.6, step: 0.01 },
+            { type: 'slider', key: 'density', label: 'Density', min: 0, max: 1, step: 0.01 },
+            { type: 'slider', key: 'contrast', label: 'Contrast', min: 0, max: 1, step: 0.01 },
+          ],
+        },
+        {
+          title: 'Levels',
+          visible: raster,
+          items: [
+            { type: 'custom', build: levelsTable },
+            { type: 'custom', build: (s) => iconLibrary(s, actions) },
             {
               type: 'buttons',
               buttons: [
                 {
-                  label: 'RESET TO PRESET',
-                  primary: true,
+                  label: 'Reset grid and levels',
                   onClick: () => store.reset(Object.keys(SHAPE_DEFAULTS)),
+                  title: 'Put cell size, levels, shapes and fine tuning back to their defaults',
                 },
               ],
             },
-            { type: 'slider', key: 'cell', label: 'CELL SIZE', min: 4, max: 64, step: 1 },
-            { type: 'slider', key: 'margin', label: 'MARGIN', min: 0, max: 0.6, step: 0.01 },
-            { type: 'slider', key: 'banding', label: 'BANDING', min: 0, max: 1, step: 0.01 },
-            { type: 'slider', key: 'density', label: 'LEVELS', min: 0, max: 1, step: 0.01 },
-            { type: 'slider', key: 'l1', label: 'L1 START', min: 0, max: 1, step: 0.01 },
-            { type: 'slider', key: 'l2', label: 'L2 START', min: 0, max: 1, step: 0.01 },
-            { type: 'slider', key: 'l3', label: 'L3 START', min: 0, max: 1, step: 0.01 },
-            { type: 'slider', key: 'l4', label: 'L4 START', min: 0, max: 1, step: 0.01 },
-            { type: 'slider', key: 'ao', label: 'CONTACT AO', min: 0, max: 1, step: 0.01, visible: isModel },
           ],
         },
         {
-          title: 'LEVEL SHAPES',
-          visible: isRaster,
+          title: 'Tone',
+          visible: (s) => raster(s) && picture(s),
           items: [
-            iconLibrary(actions),
-            ...levelRows(1),
-            ...levelRows(2),
-            ...levelRows(3),
-            ...levelRows(4),
             {
-              type: 'note',
-              text: 'Add your own icon (SVG or PNG) and pick it as the shape of any level. It takes the level colour.',
+              type: 'segment',
+              key: 'imageTone',
+              label: 'Read as',
+              options: [
+                ['tone', 'Brightness'],
+                ['solid', 'Solid shape'],
+              ],
+              titles: {
+                tone: 'Light and dark parts of the picture become different levels',
+                solid: 'Everything that is not transparent becomes full ink – for logos',
+              },
             },
+            exposure(),
           ],
         },
         {
-          title: 'LIGHT & TONE',
+          title: 'Lighting',
+          visible: model,
           items: [
             {
               type: 'select',
               key: 'lighting',
-              label: 'LIGHTING',
-              visible: isModel,
+              label: 'Rig',
               options: [
-                ['studio', 'STUDIO'],
-                ['soft', 'SOFT'],
-                ['top', 'TOP'],
-                ['side', 'SIDE'],
-                ['rim', 'RIM'],
-                ['flat', 'FLAT'],
+                ['studio', 'Studio'],
+                ['soft', 'Soft'],
+                ['top', 'Top'],
+                ['side', 'Side'],
+                ['rim', 'Rim'],
+                ['flat', 'Flat'],
               ],
             },
-            { type: 'slider', key: 'lightAngle', label: 'ANGLE', min: -180, max: 180, step: 1, visible: isModel },
-            { type: 'slider', key: 'exposure', label: 'EXPOSURE', min: 0.2, max: 3, step: 0.01 },
-            { type: 'check', key: 'shadows', label: 'SHADOWS', visible: isModel },
+            { type: 'slider', key: 'lightAngle', label: 'Angle', min: -180, max: 180, step: 1 },
+            exposure(),
+            { type: 'slider', key: 'ao', label: 'Occlusion', min: 0, max: 1, step: 0.01 },
+            { type: 'check', key: 'shadows', label: 'Shadows' },
             {
-              type: 'select',
+              type: 'segment',
               key: 'material',
-              label: 'MATERIAL',
-              visible: isModel,
+              label: 'Material',
               options: [
-                ['clay', 'CLAY'],
-                ['original', 'ORIGINAL'],
+                ['clay', 'Clay'],
+                ['original', 'Original'],
               ],
             },
-          ],
-        },
-        {
-          title: 'SCENE',
-          items: [
-            { type: 'check', key: 'play', label: 'AUTO ROTATE' },
-            { type: 'slider', key: 'loop', label: 'LOOP (S)', min: 1, max: 20, step: 0.5 },
             {
-              type: 'select',
-              key: 'dir',
-              label: 'DIRECTION',
-              options: [
-                ['left', 'LEFT'],
-                ['right', 'RIGHT'],
-              ],
-            },
-            { type: 'slider', key: 'zoom', label: 'ZOOM', min: 0.4, max: 4, step: 0.01 },
-            {
-              type: 'select',
+              type: 'segment',
               key: 'upAxis',
-              label: 'UP AXIS',
-              visible: isModel,
+              label: 'Up axis',
               options: [
-                ['y', 'Y UP'],
-                ['z', 'Z UP'],
+                ['y', 'Y'],
+                ['z', 'Z'],
               ],
             },
           ],
         },
         {
-          title: 'EXPORT',
+          title: 'Fine tuning',
+          open: false,
+          visible: raster,
+          items: [
+            {
+              type: 'segment',
+              key: 'inkFrom',
+              label: 'Ink from',
+              options: [
+                ['auto', 'Auto'],
+                ['shadows', 'Shadows'],
+                ['lights', 'Lights'],
+              ],
+            },
+            { type: 'slider', key: 'dither', label: 'Dither', min: 0, max: 1, step: 0.01 },
+            { type: 'slider', key: 'edge', label: 'Edge fade', min: 0, max: 1, step: 0.01 },
+            { type: 'slider', key: 'banding', label: 'Banding', min: 0, max: 1, step: 0.01 },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'motion',
+      label: 'Motion',
+      groups: [
+        {
+          title: 'Playback',
+          items: [
+            { type: 'check', key: 'play', label: 'Play' },
+            { type: 'slider', key: 'loop', label: 'Loop length', min: 1, max: 20, step: 0.5 },
+            { type: 'note', text: 'Everything loops seamlessly. One loop, in seconds, is one full cycle in the preview and in GIF and MP4 exports.' },
+          ],
+        },
+        {
+          title: 'Movement',
           items: [
             {
               type: 'select',
-              key: 'aspect',
-              label: 'FORMAT',
+              key: 'motion',
+              label: 'Type',
               options: [
-                ['1:1', '1:1 SQUARE'],
-                ['4:5', '4:5 PORTRAIT'],
-                ['9:16', '9:16 STORY'],
-                ['16:9', '16:9 WIDE'],
+                ['turntable', 'Turntable'],
+                ['sway', 'Sway'],
+                ['tumble', 'Tumble'],
+                ['still', 'Still'],
               ],
             },
+            {
+              type: 'segment',
+              key: 'dir',
+              label: 'Direction',
+              visible: (s) => s.motion !== 'still',
+              options: [
+                ['left', 'Left'],
+                ['right', 'Right'],
+              ],
+            },
+            {
+              type: 'slider',
+              key: 'sway',
+              label: 'Sway angle',
+              min: 0,
+              max: 90,
+              step: 1,
+              visible: (s) => s.motion === 'sway' || s.motion === 'tumble',
+            },
+            { type: 'slider', key: 'float', label: 'Float', min: 0, max: 1, step: 0.01 },
+          ],
+        },
+        {
+          title: 'Scatter and gather',
+          visible: cloud,
+          items: [
+            {
+              type: 'segment',
+              key: 'ptFx',
+              label: 'Burst',
+              options: [
+                ['none', 'Off'],
+                ['pulse', 'Pulse'],
+                ['sweep', 'Sweep'],
+              ],
+              titles: {
+                pulse: 'All points fly apart and gather again once per loop',
+                sweep: 'The burst travels across the picture from left to right',
+              },
+            },
+            { type: 'slider', key: 'ptBurst', label: 'Strength', min: 0, max: 1, step: 0.01, visible: (s) => s.ptFx !== 'none' },
+            { type: 'slider', key: 'ptDrift', label: 'Drift', min: 0, max: 1, step: 0.01 },
+          ],
+        },
+        {
+          title: 'Tone effects',
+          visible: raster,
+          items: [
+            { type: 'slider', key: 'wave', label: 'Wave', min: 0, max: 1, step: 0.01 },
+            { type: 'slider', key: 'waveFreq', label: 'Wave count', min: 0.25, max: 6, step: 0.25, digits: 2, visible: (s) => s.wave > 0 },
+            { type: 'slider', key: 'waveAngle', label: 'Wave angle', min: 0, max: 360, step: 1, visible: (s) => s.wave > 0 },
+            { type: 'slider', key: 'shimmer', label: 'Shimmer', min: 0, max: 1, step: 0.01 },
+          ],
+        },
+        {
+          title: 'Light',
+          visible: model,
+          items: [{ type: 'check', key: 'lightOrbit', label: 'Orbit the light' }],
+        },
+      ],
+    },
+    {
+      id: 'export',
+      label: 'Export',
+      groups: [
+        {
+          title: 'Still image',
+          items: [
             {
               type: 'select',
               key: 'size',
-              label: 'SIZE',
+              label: 'Short side',
               options: [
-                [512, '512'],
-                [1024, '1024'],
-                [1080, '1080'],
-                [2048, '2048'],
+                [512, '512 px'],
+                [1024, '1024 px'],
+                [1080, '1080 px'],
+                [2048, '2048 px'],
               ],
             },
             {
-              type: 'select',
+              type: 'segment',
               key: 'quality',
-              label: 'QUALITY',
+              label: 'Scale',
               options: [
                 [1, '1×'],
                 [2, '2×'],
                 [3, '3×'],
               ],
             },
-            { type: 'check', key: 'alpha', label: 'PNG ALPHA' },
+            { type: 'check', key: 'alpha', label: 'Transparent' },
             {
-              type: 'select',
+              type: 'buttons',
+              columns: 2,
+              visible: raster,
+              buttons: [
+                { label: 'Export PNG', primary: true, hint: 'E', onClick: () => actions.export('png') },
+                { label: 'Export SVG', hint: 'S', onClick: () => actions.export('svg') },
+              ],
+            },
+            {
+              type: 'buttons',
+              visible: cloud,
+              buttons: [{ label: 'Export PNG', primary: true, hint: 'E', onClick: () => actions.export('png') }],
+            },
+          ],
+        },
+        {
+          title: 'Loop',
+          items: [
+            {
+              type: 'segment',
               key: 'gifFps',
-              label: 'GIF FPS',
+              label: 'GIF frames/s',
               options: [10, 20, 25].map((v) => [v, String(v)]),
             },
             {
-              type: 'select',
+              type: 'segment',
               key: 'mp4Fps',
-              label: 'MP4 FPS',
+              label: 'MP4 frames/s',
               options: [24, 30, 60].map((v) => [v, String(v)]),
             },
             {
-              type: 'select',
+              type: 'segment',
               key: 'mp4Quality',
-              label: 'MP4 QUALITY',
+              label: 'MP4 quality',
               options: [
-                ['low', 'LOW'],
-                ['medium', 'MEDIUM'],
-                ['high', 'HIGH'],
+                ['low', 'Low'],
+                ['medium', 'Medium'],
+                ['high', 'High'],
               ],
             },
             {
               type: 'buttons',
               columns: 2,
               buttons: [
-                { label: 'EXPORT PNG', primary: true, onClick: () => actions.export('png') },
-                { label: 'EXPORT SVG', primary: true, onClick: () => actions.export('svg') },
-                { label: 'EXPORT GIF', primary: true, onClick: () => actions.export('gif') },
-                { label: 'EXPORT MP4', primary: true, onClick: () => actions.export('mp4') },
+                { label: 'Export GIF', hint: 'G', onClick: () => actions.export('gif') },
+                { label: 'Export MP4', hint: 'M', onClick: () => actions.export('mp4') },
               ],
             },
+            { type: 'note', text: 'Loops are exported at the short side above, at 1× scale, and last one loop length (Motion tab).' },
+          ],
+        },
+        {
+          title: 'Preset',
+          items: [
             {
               type: 'buttons',
               columns: 2,
               buttons: [
-                { label: 'SAVE PRESET', onClick: actions.savePreset, title: 'Download every setting as a JSON file' },
-                { label: 'LOAD PRESET', onClick: actions.loadPreset, title: 'Load settings from a JSON preset' },
+                { label: 'Save preset', onClick: actions.savePreset, title: 'Download every setting, with your icons, as a JSON file' },
+                { label: 'Load preset…', onClick: actions.loadPreset, title: 'Load settings from a preset file' },
               ],
             },
           ],
         },
-      ],
-    },
-    {
-      id: 'animate',
-      label: 'ANIMATE',
-      sections: [
         {
-          title: 'MOTION',
-          items: [
-            {
-              type: 'select',
-              key: 'motion',
-              label: 'MOTION',
-              options: [
-                ['turntable', 'TURNTABLE'],
-                ['sway', 'SWAY'],
-                ['tumble', 'TUMBLE'],
-                ['still', 'STILL'],
-              ],
-            },
-            { type: 'check', key: 'play', label: 'PLAY' },
-            { type: 'slider', key: 'loop', label: 'LOOP (S)', min: 1, max: 20, step: 0.5 },
-            {
-              type: 'select',
-              key: 'dir',
-              label: 'DIRECTION',
-              options: [
-                ['left', 'LEFT'],
-                ['right', 'RIGHT'],
-              ],
-            },
-            {
-              type: 'slider',
-              key: 'sway',
-              label: 'SWAY ANGLE',
-              min: 0,
-              max: 90,
-              step: 1,
-              visible: (s) => s.motion === 'sway' || s.motion === 'tumble',
-            },
-            { type: 'slider', key: 'float', label: 'FLOAT', min: 0, max: 1, step: 0.01 },
-          ],
-        },
-        {
-          title: 'LIGHT',
-          visible: isModel,
-          items: [{ type: 'check', key: 'lightOrbit', label: 'LIGHT ORBIT', visible: isModel }],
-        },
-        {
-          title: 'POINT FX',
-          visible: isPoints,
-          items: [
-            {
-              type: 'select',
-              key: 'ptFx',
-              label: 'GATHER',
-              options: [
-                ['none', 'OFF'],
-                ['pulse', 'PULSE'],
-                ['sweep', 'SWEEP'],
-              ],
-            },
-            { type: 'slider', key: 'ptBurst', label: 'BURST', min: 0, max: 1, step: 0.01, visible: (s) => s.ptFx !== 'none' },
-            { type: 'slider', key: 'ptDrift', label: 'DRIFT', min: 0, max: 1, step: 0.01 },
-            {
-              type: 'note',
-              text: 'The points scatter and gather again once per LOOP. SWAY in MOTION shows off the depth.',
-            },
-          ],
-        },
-        {
-          title: 'TONE FX',
-          visible: isRaster,
-          items: [
-            { type: 'slider', key: 'wave', label: 'WAVE', min: 0, max: 1, step: 0.01 },
-            { type: 'slider', key: 'waveFreq', label: 'WAVE FREQ', min: 0.25, max: 6, step: 0.25, digits: 2 },
-            { type: 'slider', key: 'waveAngle', label: 'WAVE ANGLE', min: 0, max: 360, step: 1 },
-            { type: 'slider', key: 'shimmer', label: 'SHIMMER', min: 0, max: 1, step: 0.01 },
-            {
-              type: 'note',
-              text: 'Everything here loops seamlessly: one LOOP is one full cycle, in the preview and in GIF / MP4 exports.',
-            },
-          ],
+          title: 'Shortcuts',
+          open: false,
+          items: [{ type: 'custom', build: shortcutList }],
         },
       ],
     },

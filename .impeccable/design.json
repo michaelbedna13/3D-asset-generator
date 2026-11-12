@@ -1,0 +1,340 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-12T10:29:19+00:00",
+  "title": "Design System: RASTR Studio",
+  "extensions": {
+    "colorMeta": {
+      "surround": {
+        "role": "neutral",
+        "displayName": "Surround",
+        "tonalRamp": [
+          "#141414",
+          "#232323",
+          "#303030",
+          "#3b3b3b",
+          "#505050",
+          "#8f8f8f",
+          "#adadad",
+          "#e6e6e6"
+        ]
+      },
+      "panel": {
+        "role": "neutral",
+        "displayName": "Panel",
+        "tonalRamp": [
+          "#141414",
+          "#232323",
+          "#303030",
+          "#3b3b3b",
+          "#505050",
+          "#8f8f8f",
+          "#adadad",
+          "#e6e6e6"
+        ]
+      },
+      "control": {
+        "role": "neutral",
+        "displayName": "Control",
+        "tonalRamp": [
+          "#141414",
+          "#232323",
+          "#303030",
+          "#3b3b3b",
+          "#505050",
+          "#8f8f8f",
+          "#adadad",
+          "#e6e6e6"
+        ]
+      },
+      "control-hover": {
+        "role": "neutral",
+        "displayName": "Control hover",
+        "tonalRamp": [
+          "#141414",
+          "#232323",
+          "#303030",
+          "#3b3b3b",
+          "#505050",
+          "#8f8f8f",
+          "#adadad",
+          "#e6e6e6"
+        ]
+      },
+      "selected": {
+        "role": "neutral",
+        "displayName": "Selected",
+        "tonalRamp": [
+          "#141414",
+          "#232323",
+          "#303030",
+          "#3b3b3b",
+          "#505050",
+          "#8f8f8f",
+          "#adadad",
+          "#e6e6e6"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "tonalRamp": [
+          "#141414",
+          "#232323",
+          "#303030",
+          "#3b3b3b",
+          "#505050",
+          "#8f8f8f",
+          "#adadad",
+          "#e6e6e6"
+        ]
+      },
+      "text": {
+        "role": "neutral",
+        "displayName": "Text",
+        "tonalRamp": [
+          "#141414",
+          "#232323",
+          "#303030",
+          "#3b3b3b",
+          "#505050",
+          "#8f8f8f",
+          "#adadad",
+          "#e6e6e6"
+        ]
+      },
+      "text-secondary": {
+        "role": "neutral",
+        "displayName": "Secondary text",
+        "tonalRamp": [
+          "#141414",
+          "#232323",
+          "#303030",
+          "#3b3b3b",
+          "#505050",
+          "#8f8f8f",
+          "#adadad",
+          "#e6e6e6"
+        ]
+      },
+      "text-tertiary": {
+        "role": "neutral",
+        "displayName": "Tertiary text",
+        "tonalRamp": [
+          "#141414",
+          "#232323",
+          "#303030",
+          "#3b3b3b",
+          "#505050",
+          "#8f8f8f",
+          "#adadad",
+          "#e6e6e6"
+        ]
+      },
+      "primary": {
+        "role": "primary",
+        "displayName": "Primary (light)",
+        "tonalRamp": [
+          "#141414",
+          "#232323",
+          "#303030",
+          "#3b3b3b",
+          "#505050",
+          "#8f8f8f",
+          "#adadad",
+          "#e6e6e6"
+        ]
+      },
+      "primary-text": {
+        "role": "neutral",
+        "displayName": "Text on primary",
+        "tonalRamp": [
+          "#141414",
+          "#232323",
+          "#303030",
+          "#3b3b3b",
+          "#505050",
+          "#8f8f8f",
+          "#adadad",
+          "#e6e6e6"
+        ]
+      },
+      "danger": {
+        "role": "semantic",
+        "displayName": "Danger",
+        "tonalRamp": [
+          "#3a0e10",
+          "#5e171a",
+          "#8a2227",
+          "#c9353b",
+          "#dc5a5f",
+          "#e98488",
+          "#f3b3b5",
+          "#fbe1e2"
+        ]
+      },
+      "focus": {
+        "role": "neutral",
+        "displayName": "Focus ring",
+        "tonalRamp": [
+          "#141414",
+          "#232323",
+          "#303030",
+          "#3b3b3b",
+          "#505050",
+          "#8f8f8f",
+          "#adadad",
+          "#e6e6e6"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "body": {
+        "displayName": "Body",
+        "purpose": "Labels, values, options and notes."
+      },
+      "group-title": {
+        "displayName": "Group title",
+        "purpose": "Panel group names and rail headings."
+      },
+      "wordmark": {
+        "displayName": "Wordmark",
+        "purpose": "The product name in the top bar, once."
+      },
+      "body-phone": {
+        "displayName": "Body on phones",
+        "purpose": "Everything at 860 px and below."
+      }
+    },
+    "shadows": [
+      {
+        "name": "thumb",
+        "value": "0 1px 2px rgb(0 0 0 / 0.5)",
+        "purpose": "Slider thumb, so it reads as a handle."
+      },
+      {
+        "name": "toast",
+        "value": "0 4px 16px rgb(0 0 0 / 0.4)",
+        "purpose": "Toast floating over the canvas."
+      },
+      {
+        "name": "card",
+        "value": "0 0 0 1px #3a3a3a, 0 12px 32px rgb(0 0 0 / 0.5)",
+        "purpose": "Progress card over the canvas."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease",
+        "value": "cubic-bezier(0.2, 0.8, 0.2, 1)",
+        "purpose": "State changes, 140 ms."
+      },
+      {
+        "name": "toast-in",
+        "value": "180 ms, opacity and 6 px rise",
+        "purpose": "The toast arriving; the only entrance."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "narrow-desktop",
+        "value": "1180px"
+      },
+      {
+        "name": "phone",
+        "value": "860px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Button",
+      "kind": "button",
+      "refersTo": "button",
+      "description": "Any secondary action.",
+      "html": "<button class=\"ds-btn\">Load map…</button>",
+      "css": ".ds-btn{height:26px;padding:0 10px;border:0;border-radius:4px;background:#303030;color:#e6e6e6;font:400 12px/16px 'Inter Variable',system-ui,sans-serif;cursor:pointer;transition:background-color .14s cubic-bezier(.2,.8,.2,1)}.ds-btn:hover{background:#3b3b3b}.ds-btn:active{background:#505050}.ds-btn:focus-visible{outline:2px solid #fff;outline-offset:1px}"
+    },
+    {
+      "name": "Primary button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one main action of a tab.",
+      "html": "<button class=\"ds-btn-primary\">Export PNG</button>",
+      "css": ".ds-btn-primary{height:26px;padding:0 10px;border:0;border-radius:4px;background:#e8e8e8;color:#161616;font:600 12px/16px 'Inter Variable',system-ui,sans-serif;cursor:pointer;transition:background-color .14s cubic-bezier(.2,.8,.2,1)}.ds-btn-primary:hover{background:#fff}.ds-btn-primary:active{background:#cfcfcf}.ds-btn-primary:focus-visible{outline:2px solid #fff;outline-offset:1px}"
+    },
+    {
+      "name": "Segmented control",
+      "kind": "custom",
+      "refersTo": "segmented",
+      "description": "Two to five exclusive options, all visible.",
+      "html": "<div class=\"ds-seg\" role=\"radiogroup\"><button class=\"ds-seg-btn\" role=\"radio\" aria-checked=\"true\">Point cloud</button><button class=\"ds-seg-btn\" role=\"radio\" aria-checked=\"false\">Shape raster</button></div>",
+      "css": ".ds-seg{display:inline-flex;gap:2px;padding:2px;border-radius:4px;background:#303030}.ds-seg-btn{height:22px;padding:0 12px;border:0;border-radius:3px;background:transparent;color:#adadad;font:500 12px/16px 'Inter Variable',system-ui,sans-serif;cursor:pointer;transition:background-color .14s,color .14s}.ds-seg-btn:hover{color:#e6e6e6}.ds-seg-btn[aria-checked=true]{background:#505050;color:#fff}.ds-seg-btn:focus-visible{outline:2px solid #fff;outline-offset:1px}"
+    },
+    {
+      "name": "Field",
+      "kind": "input",
+      "refersTo": "field",
+      "description": "Number, hex and select fields.",
+      "html": "<input class=\"ds-field\" value=\"0.50\">",
+      "css": ".ds-field{width:50px;height:26px;padding:0 8px;border:0;border-radius:4px;background:#303030;color:#e6e6e6;text-align:right;font:400 12px/16px 'Inter Variable',system-ui,sans-serif;font-feature-settings:'tnum'}.ds-field:hover{background:#3b3b3b}.ds-field:focus-visible{outline:2px solid #fff;outline-offset:1px}"
+    },
+    {
+      "name": "Panel tabs",
+      "kind": "nav",
+      "refersTo": "tab-selected",
+      "description": "Look, Motion, Export.",
+      "html": "<div class=\"ds-tabs\"><button class=\"ds-tab\" aria-selected=\"true\">Look</button><button class=\"ds-tab\">Motion</button><button class=\"ds-tab\">Export</button></div>",
+      "css": ".ds-tabs{display:grid;grid-template-columns:repeat(3,1fr);width:320px;background:#232323;border-bottom:1px solid #141414}.ds-tab{height:36px;border:0;background:none;color:#adadad;font:500 12px/16px 'Inter Variable',system-ui,sans-serif;cursor:pointer;box-shadow:inset 0 -2px 0 transparent}.ds-tab:hover{color:#e6e6e6}.ds-tab[aria-selected=true]{color:#fff;box-shadow:inset 0 -2px 0 #e6e6e6}.ds-tab:focus-visible{outline:2px solid #fff;outline-offset:-3px}"
+    },
+    {
+      "name": "Pairing swatch",
+      "kind": "chip",
+      "refersTo": "segmented",
+      "description": "A colour pairing: the ground with a dot of ink.",
+      "html": "<button class=\"ds-swatch\" aria-pressed=\"true\" aria-label=\"Chalk on black\"><i></i></button>",
+      "css": ".ds-swatch{width:28px;height:28px;padding:0;border:0;border-radius:4px;background:#040405;box-shadow:inset 0 0 0 1px rgb(255 255 255 / .14);display:grid;place-items:center;cursor:pointer}.ds-swatch i{width:42%;height:42%;border-radius:50%;background:#f3f0ea}.ds-swatch[aria-pressed=true]{outline:2px solid #e6e6e6;outline-offset:1px}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The only colour is the artwork.",
+    "overview": "RASTR Studio is a tool for judging and exporting pictures, so its interface is the conventional dark professional editor, played straight: the family of Lightroom, Blender and dark Figma. The owner chose this over two bolder directions. Familiarity is the feature. Nothing in the chrome competes with the canvas, and nothing in it tints how the artwork's colours are read.\n The look is chosen before anything else: both looks sit in the top bar at all times. The panel then shows only the groups that act on what is on the canvas.",
+    "keyCharacteristics": [
+      "Achromatic greys in four steps; state is shown by lightness, never by hue.",
+      "One sans family at 12 px with tabular figures; hierarchy by weight.",
+      "Sentence-case labels, title-case group names, no upper-case tracking.",
+      "Three zones with one job each: sources left, canvas centre, settings right.",
+      "One light primary button per tab, at most."
+    ],
+    "rules": [
+      {
+        "name": "The Neutral Chrome Rule",
+        "body": "No hue in the interface. Colour appears only in the canvas, in thumbnails, and in swatches that show the artwork's own colours.",
+        "section": "colors"
+      },
+      {
+        "name": "The Lightness Rule",
+        "body": "Selection, hover and focus are steps of lightness. A coloured state would be the first accent, and there is none.",
+        "section": "colors"
+      },
+      {
+        "name": "The Weight Rule",
+        "body": "Hierarchy comes from weight and from the three text colours, not from size. The scale is deliberately flat, as in the editors this sits beside.",
+        "section": "typography"
+      }
+    ],
+    "dos": [
+      "Do keep every surface achromatic and show state by lightness.",
+      "Do put a control where it acts: view controls under the canvas, look controls in the Look tab, file actions in Export.",
+      "Do hide a group that does not apply to the current look.",
+      "Do use a segmented control when all options fit on one line; use a select otherwise.",
+      "Do write labels in sentence case and name a button by what it does."
+    ],
+    "donts": [
+      "Don't add an accent colour, a gradient, a glow or a tinted grey.",
+      "Don't set labels in upper case or in a monospace face.",
+      "Don't give a tab more than one primary button.",
+      "Don't make a look, a source or an export reachable only after another action.",
+      "Don't cover the canvas with interface, except for progress and a toast."
+    ]
+  }
+}

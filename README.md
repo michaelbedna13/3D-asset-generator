@@ -15,22 +15,36 @@ npm run build      # statický web do dist/ (jde nahrát na jakýkoli hosting)
 npm run build:single   # celá appka jako jeden soubor dist-single/index.html
 ```
 
+## Ovládání
+
+Rozhraní je klasický tmavý editor ve třech zónách:
+
+- **Nahoře** je přepínač vzhledu `Point cloud` / `Shape raster`. Oba režimy jsou
+  vidět vždy. Mrak bodů potřebuje obrázek, takže když je na plátně 3D objekt,
+  přepnutí na `Point cloud` samo vybere obrázek.
+- **Vlevo** jsou zdroje: `Open file…` (nebo přetažení souboru kamkoli), vaše
+  otevřené soubory, tři ukázkové obrázky a devět vestavěných 3D objektů.
+- **Uprostřed** je plátno a pod ním lišta s tím, co se týká pohledu: formát
+  rámu, pohled kamery, zoom, přehrávání a tón okolí plátna.
+- **Vpravo** jsou tři záložky: `Look` (vzhled), `Motion` (pohyb) a `Export`.
+  V každé jsou jen skupiny, které platí pro to, co je zrovna na plátně.
+
+Dvojklik na název posuvníku ho vrátí na výchozí hodnotu.
+
 ## Co to umí
 
 | Oblast | Funkce |
 | --- | --- |
-| **Modely** | 9 vestavěných objektů, vlastní `.glb` / `.gltf` / `.obj` / `.stl` přes tlačítko `LOAD MODEL / IMAGE` nebo přetažením (i `.gltf` + `.bin` + textury najednou, Draco i Meshopt komprese) |
-| **Obrázky** | fotka nebo logo (PNG, JPG, WebP, SVG…) jako předloha místo 3D modelu; režim `BRIGHTNESS` (rastr podle jasu) nebo `SOLID SHAPE` (silueta podle průhlednosti) |
-| **Point cloud** | druhý styl pro obrázky (`IMAGE → STYLE → POINT CLOUD`): až 520 tisíc svítících bodů s hloubkou, orbit kamerou, rozptyl, animované rozlétnutí a složení (`PULSE` / `SWEEP`), drift, vinětace a zrno |
-| **Hloubka** | výchozí odhad z jasu · `ESTIMATE DEPTH` spočítá skutečnou hloubku modelem přímo v prohlížeči · vlastní hloubková mapa (`LOAD DEPTH MAP`) · uložení mapy jako PNG (`SAVE DEPTH MAP`) |
-| **Colours** | 8 barevných párů, vlastní barva popředí a pozadí, volitelná akcentní barva pro jednu úroveň |
-| **Shapes** | velikost buňky, okraj, 4 tónové úrovně s vlastním prahem, tvarem a velikostí (tečka, kroužek, křížek, plus, čtverec, kosočtverec…), banding, dither, edge fade, contact AO |
-| **Vlastní ikony** | až 6 nahraných ikon (SVG / PNG) použitelných jako tvar kterékoli úrovně; obarví se barvou úrovně a ukládají se do presetu |
-| **Lighting** | 6 světelných presetů, úhel světla, expozice, stíny, materiál clay / původní |
-| **Scene** | pohledy FRONT · 3/4 · SIDE · TOP · HERO, orbit myší / prstem, zoom, osa nahoru |
-| **Animate** | turntable / sway / tumble, float, obíhající světlo, tónová vlna, shimmer – vše v bezešvé smyčce |
-| **Export** | formáty 1:1, 4:5, 9:16, 16:9 · PNG (až 3×, i s průhledností) · SVG (vektor, každá úroveň zvlášť) · GIF · MP4 (H.264) |
-| **Workflow** | undo / redo, uložení a načtení presetu jako JSON, nastavení se pamatuje mezi návštěvami |
+| **Zdroje** | obrázek (PNG, JPG, WebP, SVG…), 3D model (`.glb`, `.gltf`, `.obj`, `.stl`, i `.gltf` + `.bin` + textury najednou, Draco i Meshopt), 3 ukázkové obrázky, 9 vestavěných objektů |
+| **Point cloud** | obrázek jako až 520 tisíc svítících bodů s hloubkou: počet a velikost bodů, práh (`Cutoff`), rozptyl, barva z obrázku nebo jedna barva, svítivé nebo plné prolnutí, vinětace a zrno |
+| **Hloubka** | výchozí odhad z jasu · `Estimate depth` spočítá skutečnou hloubku modelem přímo v prohlížeči · vlastní hloubková mapa (`Load map…`) · uložení mapy jako PNG (`Save map`) |
+| **Shape raster** | obrázek nebo 3D model jako mřížka tvarů: velikost buňky, mezera, hustota, kontrast a tabulka čtyř úrovní (práh, tvar, velikost na jednom řádku) |
+| **Vlastní ikony** | až 6 nahraných ikon (SVG / PNG) jako tvar kterékoli úrovně; obarví se barvou úrovně a ukládají se do presetu |
+| **Barvy** | 9 barevných párů jako vzorníky, vlastní barva popředí (`Ink`) a pozadí (`Ground`), akcentní barva pro jednu úroveň |
+| **Světlo** (3D) | 6 světelných sestav, úhel, expozice, stíny, occlusion, materiál clay / původní |
+| **Motion** | turntable / sway / tumble, float; u mraku bodů rozlétnutí a složení (`Pulse` / `Sweep`) a drift; u rastru tónová vlna a shimmer; vše v bezešvé smyčce |
+| **Export** | formáty 1:1, 4:5, 9:16, 16:9 · PNG (až 3×, i průhledné) · SVG (jen rastr) · GIF · MP4 (H.264) |
+| **Workflow** | undo / redo, presety v JSON, nastavení se pamatuje mezi návštěvami |
 
 ### Klávesové zkratky
 
@@ -54,9 +68,9 @@ npm run build:single   # celá appka jako jeden soubor dist-single/index.html
 Velikost buňky se udává v px vůči kratší straně 1024, takže vzhled je stejný v
 každém rozlišení i formátu.
 
-## Odhad hloubky (`ESTIMATE DEPTH`)
+## Odhad hloubky (`Estimate depth`)
 
-Tlačítko je u stylu point cloud. Použije model **Depth Anything V2 Small**
+Tlačítko je v záložce `Look`, skupina `Depth`, když je zapnutý vzhled `Point cloud`. Použije model **Depth Anything V2 Small**
 (licence Apache-2.0, 8bitová ONNX verze od `onnx-community`) a běží celé v
 prohlížeči přes ONNX Runtime (WebAssembly) ve workeru:
 
@@ -64,7 +78,7 @@ prohlížeči přes ONNX Runtime (WebAssembly) ve workeru:
   mezipaměti prohlížeče, další použití už nic nestahuje;
 - obrázek zařízení neopouští, na server se nic neposílá;
 - samotný výpočet trvá řádově sekundy na počítači, na telefonu déle;
-- výsledná mapa jde uložit (`SAVE DEPTH MAP`) a příště rovnou nahrát.
+- výsledná mapa jde uložit (`Save map`) a příště rovnou nahrát (`Load map…`).
 
 Funkce je jen v běžném buildu (`npm run dev`, `npm run build`). V jednosouborové
 verzi (`build:single`) chybí, protože ta si model stáhnout nemůže – tam poslouží
@@ -77,12 +91,15 @@ hosting. Pro GitHub Pages je připravený workflow `.github/workflows/pages.yml`
 po sloučení do `main` a zapnutí *Settings → Pages → Source → GitHub Actions* se
 appka při každém pushi sama sestaví a zveřejní.
 
-## Vlastní brand
+## Vlastní brand a vzhled rozhraní
 
 Barevné páry a výchozí hodnoty jsou v `src/state.js` (`PAIRINGS`,
-`SHAPE_DEFAULTS`, `DEFAULTS`), popis panelu v `src/schema.js`, barvy rozhraní
-jako CSS proměnné na začátku `src/style.css`. Hotové nastavení lze klientovi
-předat jako preset (`SAVE PRESET` → JSON, který se načte přetažením do okna).
+`SHAPE_DEFAULTS`, `DEFAULTS`), obsah panelu v `src/schema.js`. Hotové nastavení
+lze předat jako preset (`Save preset` → JSON, který se načte přetažením do okna).
+
+Pravidla vzhledu rozhraní jsou sepsaná v `DESIGN.md` (barvy, písmo, komponenty,
+co dělat a nedělat) a produktové zadání v `PRODUCT.md`. Barvy rozhraní jsou jako
+CSS proměnné na začátku `src/style.css`.
 
 ## Poznámky
 
